@@ -21,7 +21,8 @@
 
 #define THALLIUM_DEFINE(name, args, args_t...)                         \
   void Thallium##name(const thallium::request &thallium_req, args_t) { \
-    thallium_req.respond(name args);                                   \
+    auto result = name args;                                           \
+    thallium_req.respond(result);                                      \
   }
 
 #define THALLIUM_DEFINE1(name)                                 \
