@@ -15,12 +15,20 @@
 
 #include <hcl/common/configuration_manager.h>
 #include <hcl/common/singleton.h>
-# define EXPAND_ARGS(...) __VA_ARGS__
+#include <thallium.hpp>
+
+#define EXPAND_ARGS(...) __VA_ARGS__
 #define HCL_CONF hcl::Singleton<hcl::ConfigurationManager>::GetInstance()
 
-#define THALLIUM_DEFINE(name, args,args_t...) void Thallium##name(const tl::request &thallium_req, args_t) { thallium_req.respond(name args ); }
+#define THALLIUM_DEFINE(name, args, args_t...)                         \
+  void Thallium##name(const thallium::request &thallium_req, args_t) { \
+    thallium_req.respond(name args);                                   \
+  }
 
-#define THALLIUM_DEFINE1(name) void Thallium##name(const tl::request &thallium_req) { thallium_req.respond(name()); }
+#define THALLIUM_DEFINE1(name)                                 \
+  void Thallium##name(const thallium::request &thallium_req) { \
+    thallium_req.respond(name());                              \
+  }
 
 #ifdef HCL_ENABLE_RPCLIB
 #define RPC_CALL_WRAPPER_RPCLIB1(funcname, serverVar,ret) \
@@ -64,16 +72,16 @@
 #define RPC_CALL_WRAPPER_THALLIUM_ROCE() 
 #endif
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-#define RPC_CALL_WRAPPER_THALLIUM1(funcname, serverVar,ret)\
-{\
- return rpc->call<tl::packed_response>( serverVar , func_prefix + funcname ).template as< ret >(); \
- break;\
- }
-#define RPC_CALL_WRAPPER_THALLIUM(funcname, serverVar,ret,args...)	\
-{\
- return rpc->call<tl::packed_response>( serverVar , func_prefix + funcname ,args ).template as< ret >(); \
- break;\
- }
+#define RPC_CALL_WRAPPER_THALLIUM1(funcname, serverVar, ret)  \
+  {                                                           \
+    return rpc->call<ret>(serverVar, func_prefix + funcname); \
+    break;                                                    \
+  }
+#define RPC_CALL_WRAPPER_THALLIUM(funcname, serverVar, ret, args...) \
+  {                                                                  \
+    return rpc->call<ret>(serverVar, func_prefix + funcname, args);  \
+    break;                                                           \
+  }
 #else
 #define RPC_CALL_WRAPPER_THALLIUM1(funcname, serverVar,ret)
 #define RPC_CALL_WRAPPER_THALLIUM(funcname, serverVar,ret,args...) 

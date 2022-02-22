@@ -128,8 +128,8 @@ class AutoTrace
 #if  defined(HCL_TIMER)
     Timer timer;
 #endif
-    static int rank,item;
 #if defined(HCL_TRACE) || defined(HCL_TIMER)
+    static int rank, item;
     string m_line;
 #endif
   public:
@@ -200,10 +200,8 @@ class AutoTrace
     }
 };
 
+#if defined(HCL_TRACE) || defined(HCL_TIMER)
 int AutoTrace::rank=-1;
 int AutoTrace::item=0;
+#endif
 #endif  // INCLUDE_HCL_COMMON_DEBUG_AUTOTRACE_H_
-
-
-
-
