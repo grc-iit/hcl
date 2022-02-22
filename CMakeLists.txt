@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-2 -g3")
 set(RPC_LIB_FLAGS -L${CMAKE_PREFIX_PATH}/lib)
 include_directories(${CMAKE_PREFIX_PATH}/include)
-
+add_definitions(-w)
 option(HCL_ENABLE_RPCLIB "allow hcl to use RPCLIB" OFF)
 option(HCL_ENABLE_THALLIUM_TCP "allow hcl to use RPCLIB" ON)
 option(HCL_ENABLE_THALLIUM_ROCE "allow hcl to use RPCLIB" OFF)
@@ -68,12 +68,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 configure_file(hcl.pc.in hcl.pc @ONLY)
 
-if(HCL_ENABLE_RPCLIB)
+if (HCL_ENABLE_RPCLIB)
     set(RPC_LIB_FLAGS -lrpc ${RPC_LIB_FLAGS})
-endif()
-if(HCL_ENABLE_THALLIUM_ROCE OR HCL_ENABLE_THALLIUM_TCP)
-    set(RPC_LIB_FLAGS -lmercury -lmercury_util -lmargo -labt ${RPC_LIB_FLAGS})
-endif()
+endif ()
+if (HCL_ENABLE_THALLIUM_ROCE OR HCL_ENABLE_THALLIUM_TCP)
+    find_package(thallium CONFIG REQUIRED)
+    set(RPC_LIB_FLAGS -lmercury -lmercury_util -lmargo -labt ${RPC_LIB_FLAGS} thallium)
+endif ()
 
 set(LIB_FLAGS ${RPC_LIB_FLAGS} -lmpi -lpthread -lrt)
 
