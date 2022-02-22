@@ -15,7 +15,6 @@
 
 #include <hcl/common/configuration_manager.h>
 #include <hcl/common/singleton.h>
-#include <thallium.hpp>
 
 #define EXPAND_ARGS(...) __VA_ARGS__
 #define HCL_CONF hcl::Singleton<hcl::ConfigurationManager>::GetInstance()
