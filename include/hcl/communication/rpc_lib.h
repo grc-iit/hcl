@@ -136,53 +136,53 @@ private:
 #endif
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
                 {
-                    // Mercury addresses in endpoints must be freed before finalizing Thallium
-                    thallium_endpoints.clear();
-                    thallium_server->finalize();
-                    break;
+                  // Mercury addresses in endpoints must be freed before
+                  // finalizing Thallium
+                  thallium_endpoints.clear();
+                  thallium_server->finalize();
+                  break;
                 }
 #endif
             }
         }
     }
 
-    RPC() : server_list(),
-             server_port(HCL_CONF->RPC_PORT) {
-    AutoTrace trace = AutoTrace("RPC");
-
-    server_list = HCL_CONF->LoadServers();
-
-    /* if current rank is a server */
-    if (HCL_CONF->IS_SERVER) {
+    RPC()
+        : server_list(HCL_CONF->SERVER_LIST), server_port(HCL_CONF->RPC_PORT) {
+      AutoTrace trace = AutoTrace("RPC");
+      if (server_list.empty() && HCL_CONF->SERVER_LIST_PATH.size() > 0) {
+        server_list = HCL_CONF->LoadServers();
+      }
+      /* if current rank is a server */
+      if (HCL_CONF->IS_SERVER) {
         switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
-        case RPCLIB: {
-            rpclib_server = std::make_shared<rpc::server>(server_port+HCL_CONF->MY_SERVER);
+          case RPCLIB: {
+            rpclib_server = std::make_shared<rpc::server>(server_port +
+                                                          HCL_CONF->MY_SERVER);
             rpclib_server->suppress_exceptions(false);
-	break;
-      }
+            break;
+          }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_TCP
-        case THALLIUM_TCP: {
-	engine_init_str = HCL_CONF->TCP_CONF + "://" +
-	  HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] +
-	  ":" +
-	  std::to_string(server_port + HCL_CONF->MY_SERVER);
-	break;
-      }
+          case THALLIUM_TCP: {
+            engine_init_str = HCL_CONF->TCP_CONF + "://" +
+                              HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
+                              std::to_string(server_port + HCL_CONF->MY_SERVER);
+            break;
+          }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-      case THALLIUM_ROCE: {
-	  engine_init_str = HCL_CONF->VERBS_CONF + ";" +
-	    HCL_CONF->VERBS_DOMAIN + "://" +
-	    HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] +
-	    ":" +
-	    std::to_string(server_port+HCL_CONF->MY_SERVER);
-	  break;
-	}
+          case THALLIUM_ROCE: {
+            engine_init_str = HCL_CONF->VERBS_CONF + ";" +
+                              HCL_CONF->VERBS_DOMAIN + "://" +
+                              HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
+                              std::to_string(server_port + HCL_CONF->MY_SERVER);
+            break;
+          }
 #endif
         }
-    }
+      }
 #ifdef HCL_ENABLE_RPCLIB
     for (std::vector<rpc::client>::size_type i = 0; i < server_list.size(); ++i) {
         rpclib_clients.push_back(std::make_unique<rpc::client>(server_list[i].c_str(), server_port + i));

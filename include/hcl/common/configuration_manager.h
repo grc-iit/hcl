@@ -51,21 +51,28 @@ namespace hcl{
               SERVER_LIST(),
               BACKED_FILE_DIR("/dev/shm"),
               MEMORY_ALLOCATED(1024ULL * 1024ULL * 128ULL),
-              RPC_PORT(9000), RPC_THREADS(1),
+              RPC_PORT(9000),
+              RPC_THREADS(1),
 #if defined(HCL_ENABLE_RPCLIB)
               RPC_IMPLEMENTATION(RPCLIB),
 #elif defined(HCL_ENABLE_THALLIUM_TCP)
-        RPC_IMPLEMENTATION(THALLIUM_TCP),
+              RPC_IMPLEMENTATION(THALLIUM_TCP),
 #elif defined(HCL_ENABLE_THALLIUM_ROCE)
-        RPC_IMPLEMENTATION(THALLIUM_ROCE),
+              RPC_IMPLEMENTATION(THALLIUM_ROCE),
 #endif
-              TCP_CONF("ofi+sockets"), VERBS_CONF("ofi-verbs"), VERBS_DOMAIN("mlx5_0"),
-              IS_SERVER(false), MY_SERVER(0), NUM_SERVERS(1),
-              SERVER_ON_NODE(true), SERVER_LIST_PATH("./server_list"), DYN_CONFIG(false) {
+              TCP_CONF("ofi+sockets"),
+              VERBS_CONF("ofi-verbs"),
+              VERBS_DOMAIN("mlx5_0"),
+              IS_SERVER(false),
+              MY_SERVER(0),
+              NUM_SERVERS(1),
+              SERVER_ON_NODE(true),
+              SERVER_LIST_PATH(""),
+              DYN_CONFIG(false) {
           AutoTrace trace = AutoTrace("ConfigurationManager");
           MPI_Comm_size(MPI_COMM_WORLD, &COMM_SIZE);
           MPI_Comm_rank(MPI_COMM_WORLD, &MPI_RANK);
-      }
+        }
 
         std::vector<CharStruct> LoadServers(){
           file_load.lock();
