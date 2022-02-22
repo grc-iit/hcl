@@ -3,8 +3,7 @@
 set(examples unordered_map_test unordered_map_string_test map_test queue_test priority_queue_test multimap_test set_test global_clock_test)
 
 add_custom_target(copy_hostfile)
-add_custom_command(
-        TARGET copy_hostfile
+add_custom_command(TARGET copy_hostfile
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/hostfile
         ${CMAKE_CURRENT_BINARY_DIR})
