@@ -31,7 +31,6 @@ namespace hcl{
         uint16_t RPC_PORT;
         uint16_t RPC_THREADS;
         RPCImplementation RPC_IMPLEMENTATION;
-        int MPI_RANK, COMM_SIZE;
         CharStruct TCP_CONF;
         CharStruct VERBS_CONF;
         CharStruct VERBS_DOMAIN;
@@ -70,8 +69,6 @@ namespace hcl{
               SERVER_LIST_PATH(""),
               DYN_CONFIG(false) {
           AutoTrace trace = AutoTrace("ConfigurationManager");
-          MPI_Comm_size(MPI_COMM_WORLD, &COMM_SIZE);
-          MPI_Comm_rank(MPI_COMM_WORLD, &MPI_RANK);
         }
 
         std::vector<CharStruct> LoadServers(){
@@ -115,17 +112,17 @@ namespace hcl{
       void ConfigureDefaultClient(std::string server_list_path=""){
           if(server_list_path!="") SERVER_LIST_PATH = server_list_path;
           LoadServers();
-          IS_SERVER=false;
-          MY_SERVER=MPI_RANK%NUM_SERVERS;
-          SERVER_ON_NODE=false;
+          IS_SERVER = false;
+          MY_SERVER = false;
+          SERVER_ON_NODE = false;
       }
 
         void ConfigureDefaultServer(std::string server_list_path=""){
             if(server_list_path!="") SERVER_LIST_PATH = server_list_path;
             LoadServers();
-            IS_SERVER=true;
-            MY_SERVER=MPI_RANK%NUM_SERVERS;
-            SERVER_ON_NODE=true;
+            IS_SERVER = true;
+            MY_SERVER = false;
+            SERVER_ON_NODE = true;
         }
     };
 
