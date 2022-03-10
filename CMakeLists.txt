@@ -69,14 +69,20 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 configure_file(hcl.pc.in hcl.pc @ONLY)
 
 if (HCL_ENABLE_RPCLIB)
-    set(RPC_LIB_FLAGS -lrpc ${RPC_LIB_FLAGS})
+    find_package(rpclib REQUIRED)
+    set(RPC_LIB_FLAGS rpclib::rpc ${RPC_LIB_FLAGS})
 endif ()
 if (HCL_ENABLE_THALLIUM_ROCE OR HCL_ENABLE_THALLIUM_TCP)
     find_package(thallium CONFIG REQUIRED)
     set(RPC_LIB_FLAGS -lmercury -lmercury_util -lmargo -labt ${RPC_LIB_FLAGS} thallium)
 endif ()
 
-set(LIB_FLAGS ${RPC_LIB_FLAGS} -lmpi -lpthread -lrt)
+find_package(MPI REQUIRED COMPONENTS CXX)
+if (MPI_FOUND)
+    message(STATUS "found mpi.h at ${MPI_CXX_INCLUDE_DIRS}")
+endif ()
+include_directories(${MPI_CXX_INCLUDE_DIRS})
+set(LIB_FLAGS ${RPC_LIB_FLAGS} ${MPI_CXX_LIBRARIES} -lpthread -lrt)
 
 # libs for NATS tests
 #set(LIB_FLAGS ${LIB_FLAGS} -lnats)
