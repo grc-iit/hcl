@@ -26,7 +26,7 @@ foreach (example ${examples})
     set_target_properties (${example} PROPERTIES FOLDER test)
 endforeach()
 
-message(INFO ${CMAKE_BINARY_DIR}/libhcl.so)
+message(STATUS ${CMAKE_BINARY_DIR}/libhcl.so)
 
 # Define MPI test case template
 function(mpi target mpi_procs example ranks_per_process num_requests size_of_request server_on_node debug)
