@@ -48,3 +48,9 @@ set(examples unordered_map_test unordered_map_string_test map_test queue_test pr
 foreach (example ${examples})
     mpi(ares 4 ${example} 2 500 1000 1 0)
 endforeach ()
+
+foreach (example ${examples})
+    set(test_parameters -np 2 "${CMAKE_BINARY_DIR}/test/${example}")
+    add_test(NAME ${example} COMMAND ${MPIEXEC_EXECUTABLE} ${test_parameters})
+    set_tests_properties(${example} PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_BINARY_DIR}/libhcl.so;LD_LIBRARY_PATH=${CMAKE_SOURCE_DIR}/.spack-env/view/lib:$ENV{LD_LIBRARY_PATH};SERVER_LIST_PATH=${CMAKE_BINARY_DIR}/test/")
+endforeach ()
