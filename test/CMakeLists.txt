@@ -21,8 +21,9 @@ foreach (example ${examples})
     add_dependencies(${example} ${PROJECT_NAME})
     add_dependencies(${example} copy_hostfile)
     add_dependencies(${example} copy_server_list)
-    set_target_properties(${example} PROPERTIES ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/libhcl.so)
+    set_target_properties(${example} PROPERTIES ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/libhcl.so:${THALLIUM_LIBRARY_LD_PRELOAD})
     target_link_libraries(${example} ${PROJECT_NAME})
+    target_link_libraries(${example} ${MPI_CXX_LIBRARIES})
     set_target_properties (${example} PROPERTIES FOLDER test)
 endforeach()
 
@@ -31,8 +32,10 @@ message(STATUS ${CMAKE_BINARY_DIR}/libhcl.so)
 # Define MPI test case template
 function(mpi target mpi_procs example ranks_per_process num_requests size_of_request server_on_node debug)
     set (test_parameters  -np ${mpi_procs} -f "${CMAKE_BINARY_DIR}/test/hostfile" "${CMAKE_BINARY_DIR}/test/${example}" ${ranks_per_process} ${num_requests} ${size_of_request} ${server_on_node} ${debug})
-    add_test(NAME ${target}_${example}_MPI_${mpi_procs}_${ranks_per_process}_${num_requests}_${size_of_request}_${server_on_node}_${debug} COMMAND "mpirun" ${test_parameters})
-    set_tests_properties(${target}_${example}_MPI_${mpi_procs}_${ranks_per_process}_${num_requests}_${size_of_request}_${server_on_node}_${debug} PROPERTIES ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/libhcl.so)
+    set(test_name ${target}_${example}_MPI_${mpi_procs}_${ranks_per_process}_${num_requests}_${size_of_request}_${server_on_node}_${debug})
+    add_test(NAME ${test_name} COMMAND ${MPIEXEC_EXECUTABLE} ${test_parameters})
+    set_tests_properties(${test_name} PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_BINARY_DIR}/libhcl.so;LD_LIBRARY_PATH=${CMAKE_SOURCE_DIR}/.spack-env/view/lib:$ENV{LD_LIBRARY_PATH};SERVER_LIST_PATH=${CMAKE_BINARY_DIR}/test/")
+
 endfunction()
 
 # Define MPI test case

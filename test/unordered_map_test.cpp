@@ -68,32 +68,22 @@ namespace std {
 
 int main (int argc,char* argv[])
 {
-    int provided;
-    MPI_Init_thread(&argc,&argv, MPI_THREAD_MULTIPLE, &provided);
-    if (provided < MPI_THREAD_MULTIPLE) {
-        printf("Didn't receive appropriate MPI threading specification\n");
-        exit(EXIT_FAILURE);
-    }
-    int comm_size,my_rank;
+    MPI_Init(&argc,&argv);
+    int comm_size = 0 ,my_rank=0;
     MPI_Comm_size(MPI_COMM_WORLD,&comm_size);
     MPI_Comm_rank(MPI_COMM_WORLD,&my_rank);
     int ranks_per_server=comm_size,num_request=100;
     long size_of_request=1000;
     bool debug=false;
     bool server_on_node=false;
+    char* server_list_path = std::getenv("SERVER_LIST_PATH");
+
     if(argc > 1)    ranks_per_server = atoi(argv[1]);
     if(argc > 2)    num_request = atoi(argv[2]);
     if(argc > 3)    size_of_request = (long)atol(argv[3]);
     if(argc > 4)    server_on_node = (bool)atoi(argv[4]);
     if(argc > 5)    debug = (bool)atoi(argv[5]);
-
     int len;
-    char processor_name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Get_processor_name(processor_name, &len);
-    if (debug) {
-        printf("%s/%d: %d\n", processor_name, my_rank, getpid());
-    }
-
     if(debug && my_rank==0){
         printf("%d ready for attach\n", comm_size);
         fflush(stdout);
@@ -103,7 +93,6 @@ int main (int argc,char* argv[])
     bool is_server=(my_rank+1) % ranks_per_server == 0;
     int my_server=my_rank / ranks_per_server;
     int num_servers=comm_size/ranks_per_server;
-    std::string proc_name = std::string(processor_name);
     size_t size_of_elem = sizeof(int);
 
     printf("rank %d, is_server %d, my_server %d, num_servers %d\n",my_rank,is_server,my_server,num_servers);
@@ -121,7 +110,7 @@ int main (int argc,char* argv[])
     HCL_CONF->MY_SERVER = my_server;
     HCL_CONF->NUM_SERVERS = num_servers;
     HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
-    HCL_CONF->SERVER_LIST_PATH = "./server_list";
+    HCL_CONF->SERVER_LIST_PATH = std::string(server_list_path) + "server_list";
 
     hcl::unordered_map<KeyType,std::array<int, array_size>> *map;
     if (is_server) {

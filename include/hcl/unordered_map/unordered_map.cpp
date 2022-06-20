@@ -43,10 +43,21 @@ unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::unordered_map(C
 template<typename KeyType, typename MappedType,typename Hash, typename Allocator ,typename SharedType>
 bool unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::LocalPut(KeyType &key,
                                                   MappedType &data) {
-    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex>lock(*mutex);
-    auto value = GetData<Allocator, MappedType, SharedType>(data);
-    auto iter = myHashMap->insert_or_assign(key, value);
-    if(iter.second) size_occupied += CalculateSize<KeyType>().GetSize(key) + CalculateSize<MappedType>().GetSize(data);
+    if(is_server && !server_on_node) {
+      boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex>
+          lock(*mutex);
+      auto value = GetData<Allocator, MappedType, SharedType>(data);
+      auto iter = myHashMap->insert_or_assign(key, value);
+      if (iter.second)
+        size_occupied += CalculateSize<KeyType>().GetSize(key) +
+                         CalculateSize<MappedType>().GetSize(data);
+    } else {
+      auto value = GetData<Allocator, MappedType, SharedType>(data);
+      auto iter = myHashMap->insert_or_assign(key, value);
+      if (iter.second)
+        size_occupied += CalculateSize<KeyType>().GetSize(key) +
+                         CalculateSize<MappedType>().GetSize(data);
+    }
     return true;
 }
 /**
@@ -77,14 +88,23 @@ bool unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::Put(KeyTyp
 template<typename KeyType, typename MappedType,typename Hash, typename Allocator ,typename SharedType>
 std::pair<bool, MappedType>
 unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::LocalGet(KeyType &key) {
+  if(is_server && !server_on_node) {
     boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex>
-            lock(*mutex);
+        lock(*mutex);
     typename MyHashMap::iterator iterator = myHashMap->find(key);
     if (iterator != myHashMap->end()) {
-        return std::pair<bool, MappedType>(true, iterator->second);
+      return std::pair<bool, MappedType>(true, iterator->second);
     } else {
-        return std::pair<bool, MappedType>(false, MappedType());
+      return std::pair<bool, MappedType>(false, MappedType());
     }
+  }else{
+    typename MyHashMap::iterator iterator = myHashMap->find(key);
+    if (iterator != myHashMap->end()) {
+      return std::pair<bool, MappedType>(true, iterator->second);
+    } else {
+      return std::pair<bool, MappedType>(false, MappedType());
+    }
+  }
 }
 
 /**
@@ -111,15 +131,29 @@ unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::Get(KeyType &ke
 template<typename KeyType, typename MappedType,typename Hash, typename Allocator ,typename SharedType>
 std::pair<bool, MappedType>
 unordered_map<KeyType, MappedType, Hash, Allocator, SharedType>::LocalErase(KeyType &key) {
+  if(is_server && !server_on_node) {
     boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex>
-            lock(*mutex);
+        lock(*mutex);
     typename MyHashMap::iterator iterator = myHashMap->find(key);
     if (iterator != myHashMap->end()) {
-        size_occupied -= CalculateSize<KeyType>().GetSize(key) + CalculateSize<MappedType>().GetSize(iterator->second);
-        myHashMap->erase(iterator);
-        return std::pair<bool, MappedType>(true, MappedType());
-    }else return std::pair<bool, MappedType>(false, MappedType());
-}
+      size_occupied -= CalculateSize<KeyType>().GetSize(key) +
+                       CalculateSize<MappedType>().GetSize(iterator->second);
+      myHashMap->erase(iterator);
+      return std::pair<bool, MappedType>(true, MappedType());
+    } else
+      return std::pair<bool, MappedType>(false, MappedType());
+  }else {
+    typename MyHashMap::iterator iterator = myHashMap->find(key);
+    if (iterator != myHashMap->end()) {
+      size_occupied -= CalculateSize<KeyType>().GetSize(key) +
+                       CalculateSize<MappedType>().GetSize(iterator->second);
+      myHashMap->erase(iterator);
+      return std::pair<bool, MappedType>(true, MappedType());
+    } else
+      return std::pair<bool, MappedType>(false, MappedType());
+    }
+  }
+
 
 template<typename KeyType, typename MappedType,typename Hash, typename Allocator ,typename SharedType>
 std::pair<bool, MappedType>

@@ -11,39 +11,55 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <hcl/clock/global_clock.h>
-#include <iostream>
 #include <mpi.h>
+
+#include <iostream>
 
 int main(int argc, char **argv) {
   MPI_Init(&argc, &argv);
-  int rank, size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  int my_rank, comm_size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
-  int num_servers = 1;
-  if (argc > 1) num_servers = atoi(argv[1]);
-
-  if (size < num_servers + 1) {
-    std::cout << "MPI ranks should be at least one more than number of " <<
-        "servers" << std::endl;
-    MPI_Finalize();
-    exit(EXIT_FAILURE);
-  }
-
-  if (rank == 0) {
-    std::cout << num_servers << " Server Test" << std::endl;
+  bool debug = false;
+  int ranks_per_server = comm_size, num_request = 100;
+  long size_of_request = 1024 * 16;
+  bool server_on_node = true;
+  if (argc > 1) ranks_per_server = atoi(argv[1]);
+  if (argc > 2) num_request = atoi(argv[2]);
+  if (argc > 3) size_of_request = (long)atol(argv[3]);
+  if (argc > 4) server_on_node = (bool)atoi(argv[4]);
+  if (argc > 5) debug = (bool)atoi(argv[5]);
+  if (debug && my_rank == 0) {
+    printf("%d ready for attach\n", comm_size);
+    fflush(stdout);
+    getchar();
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
+  char *server_list_path = std::getenv("SERVER_LIST_PATH");
+  bool is_server = (my_rank + 1) % ranks_per_server == 0;
+  int my_server = my_rank / ranks_per_server;
+  int num_servers = comm_size / ranks_per_server;
+
+  if (my_rank == 0) {
+    std::cout << num_servers << " Server Test" << std::endl;
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  HCL_CONF->IS_SERVER = is_server;
+  HCL_CONF->MY_SERVER = my_server;
+  HCL_CONF->NUM_SERVERS = num_servers;
+  HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
+  HCL_CONF->SERVER_LIST_PATH = std::string(server_list_path) + "server_list";
   hcl::global_clock *clock = new hcl::global_clock();
 
-  for (uint16_t i = 0; i < size; i++) {
-    if (i == rank) {
-      std::cout << "Time rank " << rank << ": " << clock->GetTime() <<
-          std::endl;
+  for (uint16_t i = 0; i < comm_size; i++) {
+    if (i == my_rank) {
+      std::cout << "Time rank " << my_rank << ": " << clock->GetTime()
+                << std::endl;
       for (uint16_t j = 0; j < num_servers; j++) {
-        std::cout << "Time server " << j << " from rank " << rank << ": " <<
-            clock->GetTimeServer(j) << std::endl;
+        std::cout << "Time server " << j << " from rank " << my_rank << ": "
+                  << clock->GetTimeServer(j) << std::endl;
       }
     }
     MPI_Barrier(MPI_COMM_WORLD);

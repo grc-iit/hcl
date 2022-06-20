@@ -34,3 +34,6 @@ GPATH
 GRTAGS
 GTAGS
 
+/.spack-env/
+spack.lock
+
