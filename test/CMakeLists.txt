@@ -40,5 +40,11 @@ endfunction()
 
 # Define MPI test case
 foreach (example ${examples})
+    mpi(ares 4 ${example} 2 500 1000 0 0)
+endforeach()
+
+set(examples unordered_map_test unordered_map_string_test map_test queue_test priority_queue_test multimap_test set_test)
+
+foreach (example ${examples})
     mpi(ares 4 ${example} 2 500 1000 1 0)
 endforeach()
