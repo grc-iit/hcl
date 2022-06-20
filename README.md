@@ -22,18 +22,19 @@ It's primary goals are to provide
 * a familiar STL-like interface
 * a flexible programming paradigm
 * a hybrid data access model optimized for High-Performance Computing (HPC)
-* a high-performance data container infrastructure that leverages new hardware and software innovations (e.g., RDMA, RoCE, one-sided communications)
+* a high-performance data container infrastructure that leverages new hardware and software innovations (e.g., RDMA,
+  RoCE, one-sided communications)
 
 HCL consists of the following templated data structures:
 
- * global_clock
- * map
- * multimap
- * priority_queue
- * queue
- * global_sequence (sequencer)
- * set
- * unordered_map
+* global_clock
+* map
+* multimap
+* priority_queue
+* queue
+* global_sequence (sequencer)
+* set
+* unordered_map
 
 ## Compilation
 
@@ -46,6 +47,7 @@ cmake -HCL_ENABLE_RPCLIB=true ..
 make
 sudo make install
 ```
+
 If you want to install somewhere besides `/usr/local`, then use
 
 ```bash
@@ -62,11 +64,12 @@ compiling with Thallium, use either `-DHCL_ENABLE_THALLIUM_TCP` or
 `-DHCL_ENABLE_THALLIUM_ROCE`
 
 ### Dependencies
+
 - MPI
 - Boost (interprocess module)
 - RPC layer (pick one and compile appropriately)
-  - rpclib
-  - Thallium (wrapper over Mercury)
+    - rpclib
+    - Thallium (wrapper over Mercury)
 - glibc (for librt and posix threads)
 
 #### Recommended Versions
@@ -102,18 +105,18 @@ HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
 HCL_CONF->SERVER_LIST_PATH = "./server_list";
 ```
 
- * `IS_SERVER`: `true` when the data structure in the current process will act as a
-   server (store the internal data structure), `false` otherwise.
+* `IS_SERVER`: `true` when the data structure in the current process will act as a
+  server (store the internal data structure), `false` otherwise.
 
- * `MY_SERVER`: The relative rank of your server (if servers are on ranks 3 and
-   5, server relative ranks are still 0 and 1)
+* `MY_SERVER`: The relative rank of your server (if servers are on ranks 3 and
+  5, server relative ranks are still 0 and 1)
 
- * `NUM_SERVERS`: The total number of servers.
+* `NUM_SERVERS`: The total number of servers.
 
- * `SERVER_ON_NODE`: `true` when `MY_SERVER` is on the same node as the current process.
+* `SERVER_ON_NODE`: `true` when `MY_SERVER` is on the same node as the current process.
 
- * `SERVER_LIST_PATH`: An absolute or relative path to a file that lists
-   `NUM_SERVERS` hostnames or addresses, one per line, of the server processes.
+* `SERVER_LIST_PATH`: An absolute or relative path to a file that lists
+  `NUM_SERVERS` hostnames or addresses, one per line, of the server processes.
 
 Constructor example:
 
@@ -121,14 +124,14 @@ Constructor example:
 hcl::unordered_map(std::string name);
 ```
 
- * `name`: A unique name used to identify the shared memory.
+* `name`: A unique name used to identify the shared memory.
 
 See the [wiki](https://github.com/HDFGroup/hcl/wiki) for more information.
-
 
 ## Refer to this work using this citation
 
 ### Citation
+
 ```
 H. Devarajan, A. Kougkas, K. Bateman, and X. Sun. "HCL: Distributing Parallel Data Structures in Extreme Scales." In 2020 IEEE International Conference on Cluster Computing (CLUSTER). IEEE, 2020.
 ```

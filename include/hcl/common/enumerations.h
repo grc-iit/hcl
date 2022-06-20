@@ -19,4 +19,4 @@ typedef enum RPCImplementation {
   THALLIUM_ROCE = 2
 } RPCImplementation;
 
-#endif //INCLUDE_HCL_COMMON_ENUMERATIONS_H
+#endif  // INCLUDE_HCL_COMMON_ENUMERATIONS_H

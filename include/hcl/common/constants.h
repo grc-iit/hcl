@@ -12,8 +12,8 @@
 
 #ifndef INCLUDE_HCL_COMMON_CONSTANTS_H_
 #define INCLUDE_HCL_COMMON_CONSTANTS_H_
-#include <stdint.h>
 #include <hcl/common/data_structures.h>
+#include <stdint.h>
 
 const uint16_t RPC_PORT = 8080;
 const uint16_t RPC_THREADS = 1;

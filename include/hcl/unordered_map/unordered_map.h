@@ -18,41 +18,41 @@
  */
 
 /** Standard C++ Headers**/
-#include <iostream>
-#include <functional>
-#include <utility>
-#include <stdexcept>
-#include <memory>
-#include <string>
-#include <vector>
-#include <tuple>
-
-#include <hcl/communication/rpc_lib.h>
-#include <hcl/communication/rpc_factory.h>
 #include <hcl/common/singleton.h>
 #include <hcl/common/typedefs.h>
+#include <hcl/communication/rpc_factory.h>
+#include <hcl/communication/rpc_lib.h>
 
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 /** MPI Headers**/
 #include <mpi.h>
 /** RPC Lib Headers**/
 #ifdef HCL_ENABLE_RPCLIB
-#include <rpc/server.h>
 #include <rpc/client.h>
 #include <rpc/rpc_error.h>
+#include <rpc/server.h>
 #endif
 /** Thallium Headers **/
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
 #include <thallium.hpp>
 #endif
 /** Boost Headers **/
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/unordered/unordered_map.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/interprocess/managed_mapped_file.hpp>
 #include <hcl/common/container.h>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/managed_mapped_file.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/unordered/unordered_map.hpp>
 
 /** Namespaces Uses **/
 
@@ -65,75 +65,83 @@ namespace hcl {
  *
  * @tparam MappedType, the value of the HashMap
  */
-template<typename KeyType, typename MappedType,typename Hash = std::hash<KeyType>, class Allocator=nullptr_t ,class SharedType=nullptr_t>
-class unordered_map:public container {
-  private:
-    /** Class Typedefs for ease of use **/
-    typedef std::pair<const KeyType, MappedType> ValueType;
-    typedef boost::interprocess::allocator<ValueType, boost::interprocess::managed_mapped_file::segment_manager> ShmemAllocator;
-    typedef boost::interprocess::managed_mapped_file managed_segment;
-    typedef boost::unordered::unordered_map<KeyType, MappedType, Hash,
-                                                                std::equal_to<KeyType>,
-                                                                ShmemAllocator>
-                                                                MyHashMap;
-    /** Class attributes**/
-    Hash keyHash;
-    MyHashMap *myHashMap;
-  public:
-    really_long size_occupied;
-    ~unordered_map();
+template <typename KeyType, typename MappedType,
+          typename Hash = std::hash<KeyType>, class Allocator = nullptr_t,
+          class SharedType = nullptr_t>
+class unordered_map : public container {
+ private:
+  /** Class Typedefs for ease of use **/
+  typedef std::pair<const KeyType, MappedType> ValueType;
+  typedef boost::interprocess::allocator<
+      ValueType, boost::interprocess::managed_mapped_file::segment_manager>
+      ShmemAllocator;
+  typedef boost::interprocess::managed_mapped_file managed_segment;
+  typedef boost::unordered::unordered_map<
+      KeyType, MappedType, Hash, std::equal_to<KeyType>, ShmemAllocator>
+      MyHashMap;
+  /** Class attributes**/
+  Hash keyHash;
+  MyHashMap *myHashMap;
 
-    explicit unordered_map(CharStruct name_ = std::string("TEST_UNORDERED_MAP"), uint16_t port=HCL_CONF->RPC_PORT);
-    MyHashMap* data(){
-        if(server_on_node || is_server) return myHashMap;
-        else nullptr;
-    }
+ public:
+  really_long size_occupied;
+  ~unordered_map();
 
-    void construct_shared_memory() override{
-        /* Construct unordered_map in the shared memory space. */
-        myHashMap = segment.construct<MyHashMap>(name.c_str())(
-                128, Hash(), std::equal_to<KeyType>(),
-                segment.get_allocator<ValueType>());
+  explicit unordered_map(CharStruct name_ = std::string("TEST_UNORDERED_MAP"),
+                         uint16_t port = HCL_CONF->RPC_PORT);
+  MyHashMap *data() {
+    if (server_on_node || is_server)
+      return myHashMap;
+    else
+      nullptr;
+  }
 
-    }
+  void construct_shared_memory() override {
+    /* Construct unordered_map in the shared memory space. */
+    myHashMap = segment.construct<MyHashMap>(name.c_str())(
+        128, Hash(), std::equal_to<KeyType>(),
+        segment.get_allocator<ValueType>());
+  }
 
-    void open_shared_memory() override;
+  void open_shared_memory() override;
 
-    void bind_functions() override;
+  void bind_functions() override;
 
-    bool LocalPut(KeyType &key, MappedType &data);
-    std::pair<bool, MappedType> LocalGet(KeyType &key);
-    std::pair<bool, MappedType> LocalErase(KeyType &key);
-    std::vector<std::pair<KeyType, MappedType>> LocalGetAllDataInServer();
+  bool LocalPut(KeyType &key, MappedType &data);
+  std::pair<bool, MappedType> LocalGet(KeyType &key);
+  std::pair<bool, MappedType> LocalErase(KeyType &key);
+  std::vector<std::pair<KeyType, MappedType>> LocalGetAllDataInServer();
 
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-    THALLIUM_DEFINE(LocalPut, (key,data) ,KeyType &key, MappedType &data)
+  THALLIUM_DEFINE(LocalPut, (key, data), KeyType &key, MappedType &data)
 
-    // void ThalliumLocalPut(const tl::request &thallium_req, tl::bulk &bulk_handle, KeyType key) {
-    //     MappedType data = rpc->prep_rdma_server<MappedType>(thallium_req.get_endpoint(), bulk_handle);
-    //     thallium_req.respond(LocalPut(key, data));
-    // }
+  // void ThalliumLocalPut(const tl::request &thallium_req, tl::bulk
+  // &bulk_handle, KeyType key) {
+  //     MappedType data =
+  //     rpc->prep_rdma_server<MappedType>(thallium_req.get_endpoint(),
+  //     bulk_handle); thallium_req.respond(LocalPut(key, data));
+  // }
 
-    // void ThalliumLocalGet(const tl::request &thallium_req, KeyType key) {
-    //     auto retpair = LocalGet(key);
-    //     if (!retpair.first) {
-    //         printf("error\n");
-    //     }
-    //     MappedType data = retpair.second;
-    //     tl::bulk bulk_handle = rpc->prep_rdma_client<MappedType>(data);
-    //     thallium_req.respond(bulk_handle);
-    // }
+  // void ThalliumLocalGet(const tl::request &thallium_req, KeyType key) {
+  //     auto retpair = LocalGet(key);
+  //     if (!retpair.first) {
+  //         printf("error\n");
+  //     }
+  //     MappedType data = retpair.second;
+  //     tl::bulk bulk_handle = rpc->prep_rdma_client<MappedType>(data);
+  //     thallium_req.respond(bulk_handle);
+  // }
 
-    THALLIUM_DEFINE(LocalGet, (key), KeyType &key)
-    THALLIUM_DEFINE(LocalErase, (key), KeyType &key)
-    THALLIUM_DEFINE1(LocalGetAllDataInServer)
+  THALLIUM_DEFINE(LocalGet, (key), KeyType &key)
+  THALLIUM_DEFINE(LocalErase, (key), KeyType &key)
+  THALLIUM_DEFINE1(LocalGetAllDataInServer)
 #endif
 
-    bool Put(KeyType key, MappedType data);
-    std::pair<bool, MappedType> Get(KeyType &key);
-    std::pair<bool, MappedType> Erase(KeyType &key);
-    std::vector<std::pair<KeyType, MappedType>> GetAllData();
-    std::vector<std::pair<KeyType, MappedType>> GetAllDataInServer();
+  bool Put(KeyType key, MappedType data);
+  std::pair<bool, MappedType> Get(KeyType &key);
+  std::pair<bool, MappedType> Erase(KeyType &key);
+  std::vector<std::pair<KeyType, MappedType>> GetAllData();
+  std::vector<std::pair<KeyType, MappedType>> GetAllDataInServer();
 };
 
 #include "unordered_map.cpp"

@@ -23,16 +23,16 @@
 
 /** RPC Lib Headers**/
 #ifdef HCL_ENABLE_RPCLIB
-#include <rpc/server.h>
 #include <rpc/client.h>
 #include <rpc/rpc_error.h>
+#include <rpc/server.h>
 #endif
 /** Thallium Headers **/
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
 #include <thallium.hpp>
-#include <thallium/serialization/serialize.hpp>
 #include <thallium/serialization/proc_input_archive.hpp>
 #include <thallium/serialization/proc_output_archive.hpp>
+#include <thallium/serialization/serialize.hpp>
 #include <thallium/serialization/stl/array.hpp>
 #include <thallium/serialization/stl/complex.hpp>
 #include <thallium/serialization/stl/deque.hpp>
@@ -52,24 +52,24 @@
 #include <thallium/serialization/stl/vector.hpp>
 #endif
 
-#include <netdb.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
-#include <boost/interprocess/managed_mapped_file.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/vector.hpp>
+#include <boost/interprocess/managed_mapped_file.hpp>
 #include <cstdint>
-#include <utility>
+#include <fstream>
+#include <future>
+#include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
-#include <fstream>
-#include <iostream>
-#include <future>
 
 namespace bip = boost::interprocess;
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
@@ -77,208 +77,209 @@ namespace tl = thallium;
 #endif
 
 class RPC {
-private:
-    uint16_t server_port;
-    std::string name;
+ private:
+  uint16_t server_port;
+  std::string name;
 #ifdef HCL_ENABLE_RPCLIB
-    std::shared_ptr<rpc::server> rpclib_server;
-    // We can't use a std::vector<rpc::client> for these since rpc::client is neither copy
-    // nor move constructible. See https://github.com/rpclib/rpclib/issues/128
-    std::vector<std::shared_ptr<rpc::client>> rpclib_clients;
+  std::shared_ptr<rpc::server> rpclib_server;
+  // We can't use a std::vector<rpc::client> for these since rpc::client is
+  // neither copy nor move constructible. See
+  // https://github.com/rpclib/rpclib/issues/128
+  std::vector<std::shared_ptr<rpc::client>> rpclib_clients;
 #endif
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-    std::shared_ptr<tl::engine> thallium_server;
-    std::shared_ptr<tl::engine> thallium_client;
-    CharStruct engine_init_str;
-    std::vector<tl::endpoint> thallium_endpoints;
-    tl::endpoint get_endpoint(CharStruct protocol, CharStruct server_name, uint16_t server_port){
-        // We use addr lookup because mercury addresses must be exactly 15 char
-        char ip[16];
-        struct hostent *he = gethostbyname(server_name.c_str());
-        in_addr **addr_list = (struct in_addr **)he->h_addr_list;
-        strcpy(ip, inet_ntoa(*addr_list[0]));
-        CharStruct lookup_str = protocol + "://" + std::string(ip) + ":" + std::to_string(server_port);
-        return thallium_client->lookup(lookup_str.c_str());
+  std::shared_ptr<tl::engine> thallium_server;
+  std::shared_ptr<tl::engine> thallium_client;
+  CharStruct engine_init_str;
+  std::vector<tl::endpoint> thallium_endpoints;
+  tl::endpoint get_endpoint(CharStruct protocol, CharStruct server_name,
+                            uint16_t server_port) {
+    // We use addr lookup because mercury addresses must be exactly 15 char
+    char ip[16];
+    struct hostent *he = gethostbyname(server_name.c_str());
+    in_addr **addr_list = (struct in_addr **)he->h_addr_list;
+    strcpy(ip, inet_ntoa(*addr_list[0]));
+    CharStruct lookup_str =
+        protocol + "://" + std::string(ip) + ":" + std::to_string(server_port);
+    return thallium_client->lookup(lookup_str.c_str());
+  }
+  void init_engine_and_endpoints(CharStruct protocol) {
+    thallium_client = hcl::Singleton<tl::engine>::GetInstance(
+        protocol.c_str(), MARGO_CLIENT_MODE);
+    thallium_endpoints.reserve(server_list.size());
+    for (std::vector<CharStruct>::size_type i = 0; i < server_list.size();
+         ++i) {
+      thallium_endpoints.push_back(
+          get_endpoint(protocol, server_list[i], server_port + i));
     }
-    void init_engine_and_endpoints(CharStruct protocol) {
-        thallium_client = hcl::Singleton<tl::engine>::GetInstance(protocol.c_str(), MARGO_CLIENT_MODE);
-        thallium_endpoints.reserve(server_list.size());
-        for (std::vector<CharStruct>::size_type i = 0; i < server_list.size(); ++i) {
-            thallium_endpoints.push_back(get_endpoint(protocol,server_list[i],server_port + i));
-        }
-    }
+  }
 
-    /*std::promise<void> thallium_exit_signal;
+  /*std::promise<void> thallium_exit_signal;
 
-      void runThalliumServer(std::future<void> futureObj){
+    void runThalliumServer(std::future<void> futureObj){
 
-      while(futureObj.wait_for(std::chrono::milliseconds(1)) ==
-      std::future_status::timeout){} thallium_engine->wait_for_finalize();
-      }*/
+    while(futureObj.wait_for(std::chrono::milliseconds(1)) ==
+    std::future_status::timeout){} thallium_engine->wait_for_finalize();
+    }*/
 
 #endif
-    std::vector<CharStruct> server_list;
+  std::vector<CharStruct> server_list;
 
-   public:
-    void Stop() {
-      if (HCL_CONF->IS_SERVER) {
-        switch (HCL_CONF->RPC_IMPLEMENTATION) {
+ public:
+  void Stop() {
+    if (HCL_CONF->IS_SERVER) {
+      switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
-          case RPCLIB: {
-            // Twiddle thumbs
-            break;
-          }
+        case RPCLIB: {
+          // Twiddle thumbs
+          break;
+        }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_TCP
-          case THALLIUM_TCP:
+        case THALLIUM_TCP:
 #endif
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-          case THALLIUM_ROCE:
+        case THALLIUM_ROCE:
 #endif
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-          {
-            // Mercury addresses in endpoints must be freed before
-            // finalizing Thallium
-            thallium_endpoints.clear();
-            thallium_server->finalize();
-            break;
-          }
-#endif
+        {
+          // Mercury addresses in endpoints must be freed before
+          // finalizing Thallium
+          thallium_endpoints.clear();
+          thallium_server->finalize();
+          break;
         }
+#endif
       }
     }
-    ~RPC() { Stop(); }
+  }
+  ~RPC() { Stop(); }
 
-    RPC()
-        : server_list(HCL_CONF->SERVER_LIST), server_port(HCL_CONF->RPC_PORT) {
-      AutoTrace trace = AutoTrace("RPC");
-      if (server_list.empty() && HCL_CONF->SERVER_LIST_PATH.size() > 0) {
-        server_list = HCL_CONF->LoadServers();
-      }
-      /* if current rank is a server */
-      if (HCL_CONF->IS_SERVER) {
-        switch (HCL_CONF->RPC_IMPLEMENTATION) {
+  RPC() : server_list(HCL_CONF->SERVER_LIST), server_port(HCL_CONF->RPC_PORT) {
+    AutoTrace trace = AutoTrace("RPC");
+    if (server_list.empty() && HCL_CONF->SERVER_LIST_PATH.size() > 0) {
+      server_list = HCL_CONF->LoadServers();
+    }
+    /* if current rank is a server */
+    if (HCL_CONF->IS_SERVER) {
+      switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
-          case RPCLIB: {
-            rpclib_server = std::make_shared<rpc::server>(server_port +
-                                                          HCL_CONF->MY_SERVER);
-            rpclib_server->suppress_exceptions(false);
-            break;
-          }
+        case RPCLIB: {
+          rpclib_server =
+              std::make_shared<rpc::server>(server_port + HCL_CONF->MY_SERVER);
+          rpclib_server->suppress_exceptions(false);
+          break;
+        }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_TCP
-          case THALLIUM_TCP: {
-            engine_init_str = HCL_CONF->TCP_CONF + "://" +
-                              HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
-                              std::to_string(server_port + HCL_CONF->MY_SERVER);
-            break;
-          }
+        case THALLIUM_TCP: {
+          engine_init_str = HCL_CONF->TCP_CONF + "://" +
+                            HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
+                            std::to_string(server_port + HCL_CONF->MY_SERVER);
+          break;
+        }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-          case THALLIUM_ROCE: {
-            engine_init_str = HCL_CONF->VERBS_CONF + ";" +
-                              HCL_CONF->VERBS_DOMAIN + "://" +
-                              HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
-                              std::to_string(server_port + HCL_CONF->MY_SERVER);
-            break;
-          }
-#endif
+        case THALLIUM_ROCE: {
+          engine_init_str = HCL_CONF->VERBS_CONF + ";" +
+                            HCL_CONF->VERBS_DOMAIN + "://" +
+                            HCL_CONF->SERVER_LIST[HCL_CONF->MY_SERVER] + ":" +
+                            std::to_string(server_port + HCL_CONF->MY_SERVER);
+          break;
         }
+#endif
       }
+    }
 #ifdef HCL_ENABLE_RPCLIB
-    for (std::vector<rpc::client>::size_type i = 0; i < server_list.size(); ++i) {
-        rpclib_clients.push_back(std::make_unique<rpc::client>(server_list[i].c_str(), server_port + i));
+    for (std::vector<rpc::client>::size_type i = 0; i < server_list.size();
+         ++i) {
+      rpclib_clients.push_back(std::make_unique<rpc::client>(
+          server_list[i].c_str(), server_port + i));
     }
 #endif
     run(HCL_CONF->RPC_THREADS);
-}
+  }
 
+  template <typename F>
+  void bind(CharStruct str, F func);
 
-    template <typename F>
-    void bind(CharStruct str, F func);
-
-    void run(size_t workers = RPC_THREADS) {
-        AutoTrace trace = AutoTrace("RPC::run", workers);
-        if (HCL_CONF->IS_SERVER){
-            switch (HCL_CONF->RPC_IMPLEMENTATION) {
+  void run(size_t workers = RPC_THREADS) {
+    AutoTrace trace = AutoTrace("RPC::run", workers);
+    if (HCL_CONF->IS_SERVER) {
+      switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
-                case RPCLIB: {
-                    rpclib_server->async_run(workers);
-                break;
-            }
+        case RPCLIB: {
+          rpclib_server->async_run(workers);
+          break;
+        }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_TCP
-                case THALLIUM_TCP:
+        case THALLIUM_TCP:
 #endif
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-                    case THALLIUM_ROCE:
+        case THALLIUM_ROCE:
 #endif
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-                {
-                    thallium_server = hcl::Singleton<tl::engine>::GetInstance(engine_init_str.c_str(), THALLIUM_SERVER_MODE,true,HCL_CONF->RPC_THREADS);
-                    break;
-                }
-#endif
-            }
+        {
+          thallium_server = hcl::Singleton<tl::engine>::GetInstance(
+              engine_init_str.c_str(), THALLIUM_SERVER_MODE, true,
+              HCL_CONF->RPC_THREADS);
+          break;
         }
-        switch (HCL_CONF->RPC_IMPLEMENTATION) {
+#endif
+      }
+    }
+    switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
-            case RPCLIB: {
-
-                break;
-            }
+      case RPCLIB: {
+        break;
+      }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_TCP
-            case THALLIUM_TCP: {
-                init_engine_and_endpoints(HCL_CONF->TCP_CONF);
-                break;
-            }
+      case THALLIUM_TCP: {
+        init_engine_and_endpoints(HCL_CONF->TCP_CONF);
+        break;
+      }
 #endif
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-                case THALLIUM_ROCE: {
-                init_engine_and_endpoints(HCL_CONF->VERBS_CONF);
-                break;
-            }
+      case THALLIUM_ROCE: {
+        init_engine_and_endpoints(HCL_CONF->VERBS_CONF);
+        break;
+      }
 #endif
-        }
     }
+  }
 
 #ifdef HCL_ENABLE_THALLIUM_ROCE
-    template<typename MappedType>
-    MappedType prep_rdma_server(tl::endpoint endpoint, tl::bulk &bulk_handle);
+  template <typename MappedType>
+  MappedType prep_rdma_server(tl::endpoint endpoint, tl::bulk &bulk_handle);
 
-    template<typename MappedType>
-    tl::bulk prep_rdma_client(MappedType &data);
+  template <typename MappedType>
+  tl::bulk prep_rdma_client(MappedType &data);
 #endif
-    /**
-     * Response should be RPCLIB_MSGPACK::object_handle for rpclib and
-     * tl::packed_response for thallium/mercury
-     */
-    template <typename Response, typename... Args>
-    Response call(uint16_t server_index,
-                  CharStruct const &func_name,
-                  Args... args);
-    /**
-     * Response should be RPCLIB_MSGPACK::object_handle for rpclib and
-     * tl::packed_response for thallium/mercury
-     */
-    template <typename Response, typename... Args>
-    Response call(CharStruct &server,
-                  uint16_t &port,
-                  CharStruct const &func_name,
-                  Args... args);
-    template <typename Response, typename... Args>
-    Response callWithTimeout(uint16_t server_index,
-                  int timeout_ms,
-                  CharStruct const &func_name,
-                  Args... args);
-    template <typename Response, typename... Args>
-    std::future<Response> async_call(
-            uint16_t server_index, CharStruct const &func_name, Args... args);
-    template <typename Response, typename... Args>
-    std::future<Response> async_call(CharStruct &server,
-            uint16_t &port, CharStruct const &func_name, Args... args);
-
+  /**
+   * Response should be RPCLIB_MSGPACK::object_handle for rpclib and
+   * tl::packed_response for thallium/mercury
+   */
+  template <typename Response, typename... Args>
+  Response call(uint16_t server_index, CharStruct const &func_name,
+                Args... args);
+  /**
+   * Response should be RPCLIB_MSGPACK::object_handle for rpclib and
+   * tl::packed_response for thallium/mercury
+   */
+  template <typename Response, typename... Args>
+  Response call(CharStruct &server, uint16_t &port, CharStruct const &func_name,
+                Args... args);
+  template <typename Response, typename... Args>
+  Response callWithTimeout(uint16_t server_index, int timeout_ms,
+                           CharStruct const &func_name, Args... args);
+  template <typename Response, typename... Args>
+  std::future<Response> async_call(uint16_t server_index,
+                                   CharStruct const &func_name, Args... args);
+  template <typename Response, typename... Args>
+  std::future<Response> async_call(CharStruct &server, uint16_t &port,
+                                   CharStruct const &func_name, Args... args);
 };
 
 #include "rpc_lib.cpp"
