@@ -156,6 +156,13 @@ namespace hcl
 	     {
 		     return my_table->get(k,v);	
 	     }
+	     ValueT LocalGetValue(KeyT &k)
+	     {
+		ValueT v;
+		new (&v) ValueT();
+		bool b = LocalGet(k,&v);
+		return v;
+	     }
 
 	     template<typename... Args>
 	     bool LocalUpdateField(KeyT &k,void(*f)(ValueT*,Args&&... args),Args&&...args_)
@@ -166,7 +173,7 @@ namespace hcl
 	     uint32_t Insert(uint32_t &s, KeyT& k,ValueT& v);
 	     bool Find(uint32_t &s,KeyT& k);
 	     bool Erase(uint32_t &s, KeyT& k);
-	     //ValueT Get(uint32_t &s, KeyT& k);
+	     ValueT Get(uint32_t &s, KeyT& k);
 	     bool Update(uint32_t &s, KeyT& k,ValueT& v);
 	     
 	     #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
@@ -174,6 +181,7 @@ namespace hcl
     		THALLIUM_DEFINE(LocalFind, (k), KeyT& k)
     		THALLIUM_DEFINE(LocalErase, (k), KeyT& k)
 		THALLIUM_DEFINE(LocalUpdate, (k,v), KeyT& k, ValueT& v)
+		THALLIUM_DEFINE(LocalGetValue,(k),KeyT& k)
 	     #endif
 
 

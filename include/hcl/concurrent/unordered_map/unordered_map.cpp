@@ -61,7 +61,7 @@ bool unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Erase(uint32_t &ser
    AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Erase(remote)",k);
    return RPC_CALL_WRAPPER("_Erase",server,bool,k);
 }
-/*
+
 template<class KeyT,
 	 class ValueT,
 	 class HashFcn,
@@ -70,7 +70,7 @@ ValueT unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Get(uint32_t &ser
 {
    AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Get(remote)",k);
    return RPC_CALL_WRAPPER("_Get",server,ValueT,k);
-}*/
+}
 
 template<class KeyT,
 	 class ValueT,
@@ -121,10 +121,14 @@ switch (HCL_CONF->RPC_IMPLEMENTATION)
 		     std::bind(&hcl::unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalErase, this));
 	    std::function<bool(KeyT&,ValueT&)>updateFunc(
 		     std::bind(&hcl::unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalUpdate, this));
+	    std::function<ValueT(KeyT&)>getFunc(
+		     std::bind(&hcl::unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalGetValue,this));
+
             rpc->bind(func_prefix+"_Insert", insertFunc);
             rpc->bind(func_prefix+"_Find", findFunc);
             rpc->bind(func_prefix+"_Erase", eraseFunc);
 	    rpc->bind(func_prefix+"_Update",updateFunc);
+	    rpc->bind(func_prefix+"_Get",getFunc);
             break;
         }
 #endif
@@ -146,10 +150,13 @@ switch (HCL_CONF->RPC_IMPLEMENTATION)
 		    std::function<void(const tl::request &,KeyT&,ValueT&)> updateFunc(
 			std::bind(&hcl::unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalUpdate, this, std::placeholders::_1,std::placeholders::_2,std::placeholders::_3));
 
+		    std::function<void(const tl::request &,KeyT&)> getFunc(std::bind(&hcl::unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalGetValue,this,std::placeholders::_1,std::placeholders::_2));
+
                     rpc->bind(func_prefix+"_Insert",insertFunc);
                     rpc->bind(func_prefix+"_Find", findFunc);
                     rpc->bind(func_prefix+"_Erase", eraseFunc);
 		    rpc->bind(func_prefix+"_Update",updateFunc);
+		    rpc->bind(func_prefix+"_Get",getFunc);
                     break;
                 }
 #endif

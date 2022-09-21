@@ -33,26 +33,6 @@ void serialize(A &ar, uint64_t &a) {
 }*/
 #endif
 
-void map_operations(struct thread_arg *t)
-{
-
-	for(int i=0;i<t->num_operations;i++)
-	{
-		uint32_t op = random()%3;
-		uint32_t k = random()%100000;
-		uint32_t s = 0;
-		uint32_t ret = block_map->Insert(s,k,k);
-		/*if(op==0)
-		uint32_t ret = block_map->LocalInsert(k,k);
-		else if(op==1)
-			bool s = block_map->LocalFind(k);
-		else if(op==2)
-			bool s = block_map->LocalErase(k);*/
-	}
-
-
-}
-
 int main(int argc,char **argv)
 {
 
@@ -67,7 +47,7 @@ int main(int argc,char **argv)
    bool server_on_node = false;
    int my_server=rank/ranks_per_server;
    int num_servers=comm_size/ranks_per_server;
-
+   long size_of_request = 1000;
 
    HCL_CONF->IS_SERVER = is_server;
    HCL_CONF->MY_SERVER = my_server;
