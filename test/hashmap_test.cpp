@@ -11,13 +11,7 @@
 #include <queue>
 #include <hcl/common/data_structures.h>
 #include <hcl/concurrent/unordered_map/unordered_map.h>
-#include <thread>
-
-struct thread_arg
-{
-   int tid;
-   int num_operations;
-};
+#include <random>
 
 hcl::unordered_map_concurrent<uint32_t,uint32_t> *block_map;
 
@@ -48,6 +42,7 @@ int main(int argc,char **argv)
    int my_server=rank/ranks_per_server;
    int num_servers=comm_size/ranks_per_server;
    long size_of_request = 1000;
+   int num_request = 100;
 
    HCL_CONF->IS_SERVER = is_server;
    HCL_CONF->MY_SERVER = my_server;
@@ -55,8 +50,16 @@ int main(int argc,char **argv)
    HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
    HCL_CONF->SERVER_LIST_PATH = "./server_list";
 
+   std::default_random_engine rd;
+   std::uniform_int_distribution<int32_t> dist(0,100000000);
+
+   rd.seed(rank);
+   auto die = std::bind(dist,rd);
+
+   hcl::unordered_map_concurrent<uint32_t,uint32_t> *block_map;
+
    if(is_server)
-   std::cout <<" rank = "<<rank<<" my_server "<<my_server<<std::endl;
+   std::cout <<" server rank = "<<rank<<std::endl;
 
    uint64_t total_length = 1024;
    block_map = new hcl::unordered_map_concurrent<uint32_t,uint32_t> ();
@@ -64,21 +67,19 @@ int main(int argc,char **argv)
    
    block_map->initialize_tables(total_length,num_servers,my_server,UINT32_MAX);
 
-   int num_threads = 1;
-
-   std::vector<struct thread_arg> t_args(num_threads);
-   std::vector<std::thread> workers(num_threads);
-
    MPI_Barrier(MPI_COMM_WORLD);
 
    if(!is_server)
    {
 
-   int num_operations = 100000;
+   int num_operations = num_request/comm_size;
+   int rem = num_request%comm_size;
+   if(rank < rem) num_operations++;
+
    for(int i=0;i<num_operations;i++)
    {
      int op = random()%3;
-     uint32_t k = random()%1000000;
+     uint32_t k = dist(rd);
      uint32_t server = block_map->serverLocation(k);
      if(op==0)
      uint32_t ret = block_map->Insert(server,k,k);
