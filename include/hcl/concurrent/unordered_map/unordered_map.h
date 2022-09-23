@@ -87,8 +87,8 @@ class unordered_map_concurrent : public container
 
    uint64_t serverLocation(KeyT &k)
    {
-      uint64_t localSize = totalSize/num_servers;
-      uint64_t rem = totalSize%num_servers;
+      uint64_t localSize = totalSize/nservers;
+      uint64_t rem = totalSize%nservers;
       uint64_t hashval = HashFcn()(k);
       uint64_t v = hashval % totalSize;
       uint64_t offset = rem*(localSize+1);
