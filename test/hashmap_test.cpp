@@ -73,8 +73,8 @@ int main(int argc, char *argv[]) {
 
   size_t size_of_elem = sizeof(int);
 
-  printf("rank %d, is_server %d, my_server %d, num_servers %d\n", my_rank,
-         is_server, my_server, num_servers);
+  /*printf("rank %d, is_server %d, my_server %d, num_servers %d\n", my_rank,
+         is_server, my_server, num_servers);*/
 
   const int array_size = TEST_REQUEST_SIZE;
 
@@ -103,121 +103,66 @@ int main(int argc, char *argv[]) {
 
   hcl::unordered_map_concurrent<int,int> *map = new hcl::unordered_map_concurrent<int,int>();
 
-  uint64_t total_size = 1024;
+  uint64_t total_size = 8192;
   map->initialize_tables(total_size,num_servers,my_server,INT32_MAX);
 
   MPI_Barrier(MPI_COMM_WORLD);
+   
+  num_request = 100000;
 
   MPI_Comm client_comm;
   MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);
   int client_comm_size;
+  int client_rank;
   MPI_Comm_size(client_comm, &client_comm_size);
+  MPI_Comm_rank(client_comm, &client_rank);
+
+  int num_ops = num_request / client_comm_size;
+  int rem = num_request % client_comm_size;
+  if(client_rank < rem) num_ops++;
+
   MPI_Barrier(MPI_COMM_WORLD);
-  if (!is_server) {
-    Timer llocal_map_timer = Timer();
+  if (!is_server) 
+  {
 
     MPI_Barrier(client_comm);
+    auto t1 = std::chrono::high_resolution_clock::now(); 
 
-    if (HCL_CONF->SERVER_ON_NODE) {
-      Timer local_map_timer = Timer();
-      /*Local map test*/
-      for (int i = 0; i < num_request; i++) 
-      {
-        int val = dist(rd);
-	int v = 1;
-        auto key = map->serverLocation(val);
-        local_map_timer.resumeTime();
-        map->Insert(key,val,v);
-        local_map_timer.pauseTime();
-      }
-      double local_map_throughput = num_request /
-                                    local_map_timer.getElapsedTime() * 1000 *
-                                    size_of_elem * my_vals.size() / 1024 / 1024;
-
-      Timer local_get_map_timer = Timer();
-      /*Local map test*/
-      for (int i = 0; i < num_request; i++) {
-        int val = dist(rd);
-        auto key = map->serverLocation(val);
-        local_get_map_timer.resumeTime();
-        auto result = map->Find(key,val);
-        local_get_map_timer.pauseTime();
-      }
-
-      double local_get_map_throughput =
-          num_request / local_get_map_timer.getElapsedTime() * 1000 *
-          size_of_elem * my_vals.size() / 1024 / 1024;
-
-      double local_put_tp_result, local_get_tp_result;
-      if (client_comm_size > 1) {
-        MPI_Reduce(&local_map_throughput, &local_put_tp_result, 1, MPI_DOUBLE,
-                   MPI_SUM, 0, client_comm);
-        MPI_Reduce(&local_get_map_throughput, &local_get_tp_result, 1,
-                   MPI_DOUBLE, MPI_SUM, 0, client_comm);
-        local_put_tp_result /= client_comm_size;
-        local_get_tp_result /= client_comm_size;
-      } else {
-        local_put_tp_result = local_map_throughput;
-        local_get_tp_result = local_get_map_throughput;
-      }
-
-      if (my_rank == 0) {
-        printf("local_map_throughput put: %f\n", local_put_tp_result);
-        printf("local_map_throughput get: %f\n", local_get_tp_result);
-      }
+    for(int i=0;i<num_ops;i++)
+    {
+	int op = dist(rd)%3;
+	if(op==0)
+	{
+	    int k = dist(rd);
+	    uint64_t r = map->serverLocation(k);
+	    bool s = map->Insert(r,k,k);
+	}
+	else if(op==1)
+	{
+	   int k = dist(rd);
+	   uint64_t r = map->serverLocation(k);
+	   bool s = map->Find(r,k);
+	}
+	else if(op==2)
+	{
+	  int k = dist(rd);
+	  uint64_t r = map->serverLocation(k);
+	  bool s = map->Erase(r,k);
+	}
     }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    double t = std::chrono::duration<double>(t2-t1).count();
     MPI_Barrier(client_comm);
 
-    if (!HCL_CONF->SERVER_ON_NODE) {
-      Timer remote_map_timer = Timer();
-      /*Remote map test*/
-      for (int i = 0; i < num_request; i++) {
-        int val = dist(rd);
-	int v = 1;
-        auto key = map->serverLocation(val);
-        remote_map_timer.resumeTime();
-        map->Insert(key,val,v);
-        remote_map_timer.pauseTime();
-      }
-      double remote_map_throughput =
-          num_request / remote_map_timer.getElapsedTime() * 1000 *
-          size_of_elem * my_vals.size() / 1024 / 1024;
+    double total_time = 0;
+    MPI_Allreduce(&t,&total_time,1,MPI_DOUBLE,MPI_MAX,client_comm);
+    if(client_rank==0) std::cout <<" Number of request = "<<num_request<<" Total time taken = "<<t<<" seconds"<<std::endl;
 
-      MPI_Barrier(client_comm);
-
-      Timer remote_get_map_timer = Timer();
-      /*Remote map test*/
-      for (int i = 0; i < num_request; i++) {
-        int val = dist(rd);
-        auto key = map->serverLocation(val);
-        remote_get_map_timer.resumeTime();
-        map->Find(key,val);
-        remote_get_map_timer.pauseTime();
-      }
-      double remote_get_map_throughput =
-          num_request / remote_get_map_timer.getElapsedTime() * 1000 *
-          size_of_elem * my_vals.size() / 1024 / 1024;
-
-      double remote_put_tp_result, remote_get_tp_result;
-      if (client_comm_size > 1) {
-        MPI_Reduce(&remote_map_throughput, &remote_put_tp_result, 1, MPI_DOUBLE,
-                   MPI_SUM, 0, client_comm);
-        remote_put_tp_result /= client_comm_size;
-        MPI_Reduce(&remote_get_map_throughput, &remote_get_tp_result, 1,
-                   MPI_DOUBLE, MPI_SUM, 0, client_comm);
-        remote_get_tp_result /= client_comm_size;
-      } else {
-        remote_put_tp_result = remote_map_throughput;
-        remote_get_tp_result = remote_get_map_throughput;
-      }
-
-      if (my_rank == 0) {
-        printf("remote map throughput (put): %f\n", remote_put_tp_result);
-        printf("remote map throughput (get): %f\n", remote_get_tp_result);
-      }
-    }
   }
   MPI_Barrier(MPI_COMM_WORLD);
+  if(is_server) 
+    std::cout <<" Number of elements allocated = "<<map->allocated()<<" removed = "<<map->removed()<<std::endl;
   delete (map);
   MPI_Finalize();
   exit(EXIT_SUCCESS);

@@ -14,11 +14,11 @@
 #define INCLUDE_HCL_UNORDERED_MAP_CONCURRENT_CPP_
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
-uint32_t unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Insert(uint64_t& s,KeyT &key, ValueT &data) 
+bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Insert(uint64_t& s,KeyT &key, ValueT &data) 
 {
   uint16_t key_int = static_cast<uint16_t>(s);
   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Insert(remote)", key, data);
-  return RPC_CALL_WRAPPER("_Insert", key_int, uint32_t, key, data);
+  return RPC_CALL_WRAPPER("_Insert", key_int,bool, key, data);
 }
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
@@ -30,11 +30,27 @@ bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Find(uint64_t &s,K
 }
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
-bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Erase(uint64_t &s,KeyT &key) {
+bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Erase(uint64_t &s,KeyT &key) 
+{
   uint16_t key_int = static_cast<uint16_t>(s);
   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Erase(remote)", key);
   return RPC_CALL_WRAPPER("_Erase", key_int,bool, key);
 }
 
+template <typename KeyT, typename ValueT, typename HashFcn, typename EqualFcn>
+ValueT unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Get(uint64_t &s, KeyT &key)
+{
+   uint16_t key_int = static_cast<uint16_t>(s);
+   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Get(remote)",key);
+   return RPC_CALL_WRAPPER("_Get",key_int,ValueT,key);
+}
+
+template<typename KeyT, typename ValueT, typename HashFcn, typename EqualFcn>
+bool unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Update(uint64_t &s,KeyT &key,ValueT &data)
+{
+   uint16_t key_int = static_cast<uint16_t>(s);
+   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Update(remote)",key,data);
+   return RPC_CALL_WRAPPER("_Update",key_int,bool,key,data);
+}
 
 #endif  

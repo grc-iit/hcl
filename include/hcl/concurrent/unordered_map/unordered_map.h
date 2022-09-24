@@ -87,8 +87,8 @@ class unordered_map_concurrent : public container
 
    uint64_t serverLocation(KeyT &k)
    {
-      uint64_t localSize = totalSize/nservers;
-      uint64_t rem = totalSize%nservers;
+      uint64_t localSize = totalSize/num_servers;
+      uint64_t rem = totalSize%num_servers;
       uint64_t hashval = HashFcn()(k);
       uint64_t v = hashval % totalSize;
       uint64_t offset = rem*(localSize+1);
@@ -154,7 +154,7 @@ class unordered_map_concurrent : public container
     switch (HCL_CONF->RPC_IMPLEMENTATION) {
 #ifdef HCL_ENABLE_RPCLIB
       case RPCLIB: {
-        std::function<uint32_t(KeyT &, ValueT &)> insertFunc(
+        std::function<bool(KeyT &, ValueT &)> insertFunc(
             std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::LocalInsert, this,
                       std::placeholders::_1, std::placeholders::_2));
         std::function<bool(KeyT &)> findFunc(
@@ -163,10 +163,18 @@ class unordered_map_concurrent : public container
         std::function<bool(KeyT &)> eraseFunc(
             std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::LocalErase, this,
                       std::placeholders::_1));
+	std::function<ValueT(KeyT&)> getFunc(
+	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalGetValue, this,
+		   std::placeholders::_1));
+	std::function<bool(KeyT&,ValueT&)>updateFunc(
+	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalUpdate, this,
+		 std::placeholders::_1,std::placeholders::_2));
 
         rpc->bind(func_prefix + "_Insert", insertFunc);
         rpc->bind(func_prefix + "_Find", findFunc);
         rpc->bind(func_prefix + "_Erase", eraseFunc);
+	rpc->bind(func_prefix + "_Get", getFunc);
+	rpc->bind(func_prefix + "_Update", updateFunc);
         break;
       }
 #endif
@@ -188,10 +196,18 @@ class unordered_map_concurrent : public container
         std::function<void(const tl::request &, KeyT &)> eraseFunc(
             std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalErase,
                       this, std::placeholders::_1, std::placeholders::_2));
+	std::function<void(const tl::request &, KeyT &)> getFunc(
+	    std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalGetValue,
+		      this, std::placeholders::_1, std::placeholders::_2));
+	std::function<void(const tl::request &, KeyT &, ValueT &)> updateFunc(
+	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalUpdate,
+		     this,std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
         rpc->bind(func_prefix + "_Insert", insertFunc);
         rpc->bind(func_prefix + "_Find", findFunc);
         rpc->bind(func_prefix + "_Erase", eraseFunc);
+	rpc->bind(func_prefix + "_Get", getFunc);
+	rpc->bind(func_prefix + "_Update", updateFunc);
         break;
       }
 #endif
@@ -217,10 +233,11 @@ class unordered_map_concurrent : public container
      return my_table;
   }
 
-  uint32_t LocalInsert(KeyT &k,ValueT &v)
+  bool LocalInsert(KeyT &k,ValueT &v)
   {
-   return my_table->insert(k,v);
-             
+   uint32_t r = my_table->insert(k,v);
+   if(r != NOT_IN_TABLE) return true;
+   else return false;
   }
   bool LocalFind(KeyT &k)
   {
@@ -239,6 +256,13 @@ class unordered_map_concurrent : public container
   {
        return my_table->get(k,v);
   }
+  ValueT LocalGetValue(KeyT &k)
+  {
+	ValueT v;
+	new (&v) ValueT();
+	bool b = LocalGet(k,&v);
+	return v;
+  }
 
   template<typename... Args>
   bool LocalUpdateField(KeyT &k,void(*f)(ValueT*,Args&&... args),Args&&...args_)
@@ -246,18 +270,29 @@ class unordered_map_concurrent : public container
      return my_table->update_field(k,f,std::forward<Args>(args_)...);
   }
 
+  uint64_t allocated()
+  {
+     return my_table->allocated_nodes();
+  }
+
+  uint64_t removed()
+  {
+     return my_table->removed_nodes();
+  }
+
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
   THALLIUM_DEFINE(LocalInsert, (k,v), KeyT& k, ValueT& v)
   THALLIUM_DEFINE(LocalFind, (k), KeyT& k)
   THALLIUM_DEFINE(LocalErase, (k), KeyT& k)
-  //THALLIUM_DEFINE(LocalUpdate, (k,v), KeyT& k, ValueT& v)
+  THALLIUM_DEFINE(LocalGetValue, (k), KeyT & k)
+  THALLIUM_DEFINE(LocalUpdate, (k,v), KeyT& k, ValueT& v)
 #endif
 
-   uint32_t Insert(uint64_t &s, KeyT& k,ValueT& v);
+   bool Insert(uint64_t &s, KeyT& k,ValueT& v);
    bool Find(uint64_t &s,KeyT& k);
    bool Erase(uint64_t &s, KeyT& k);
-   //ValueT Get(uint32_t &s, KeyT& k);
-   //bool Update(uint32_t &s, KeyT& k,ValueT& v);
+   ValueT Get(uint64_t &s, KeyT& k);
+   bool Update(uint64_t &s, KeyT& k,ValueT& v);
 
 
 };
