@@ -24,6 +24,7 @@
 #include <map>
 #include <utility>
 #include <random>
+#include <cassert>
 
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
 template <typename A>
@@ -64,10 +65,11 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
     getchar();
   }
-  MPI_Barrier(MPI_COMM_WORLD);
   bool is_server = (my_rank + 1) % ranks_per_server == 0;
   int my_server = my_rank / ranks_per_server;
   int num_servers = comm_size / ranks_per_server;
+
+  assert (comm_size%ranks_per_server==0);
 
   std::string proc_name = std::string(processor_name);
 
@@ -81,10 +83,7 @@ int main(int argc, char *argv[]) {
   if (size_of_request != array_size) 
   {
     if(my_rank==0)
-    printf(
-        "Please set TEST_REQUEST_SIZE in include/hcl/common/constants.h "
-        "instead. Testing with %d\n",
-        array_size);
+	 std::cout <<" Please set request size and number of RPC threads in constants.h. Default value for request size is "<<TEST_REQUEST_SIZE<<" and number of RPC_THREADS is 1"<<std::endl;
   }
 
   std::array<int, array_size> my_vals = std::array<int, array_size>();
@@ -108,7 +107,7 @@ int main(int argc, char *argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
    
-  num_request = 100000;
+  num_request = 1000000;
 
   MPI_Comm client_comm;
   MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);

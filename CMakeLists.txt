@@ -4,7 +4,7 @@ project(hcl VERSION 1.0.0 DESCRIPTION "HCL: A library for flexible distributed d
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-2 -g3 -lm -lc -ldl -pthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-2 -g3 -lm -lc -ldl -pthread -Wno-return-type")
 set(RPC_LIB_FLAGS "")
 include_directories(${CMAKE_PREFIX_PATH}/include)
 add_definitions(-w)
