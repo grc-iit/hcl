@@ -44,6 +44,7 @@ set(HCL_SRC  include/hcl/common/singleton.h
                 include/hcl/communication/rpc_lib.h
                 include/hcl/unordered_map/unordered_map.h
 		include/hcl/concurrent/unordered_map/unordered_map.h
+		include/hcl/concurrent/queue/queue.h
                 include/hcl/map/map.h
                 include/hcl/multimap/multimap.h
                 include/hcl/clock/global_clock.h
