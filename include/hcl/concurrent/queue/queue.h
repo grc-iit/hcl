@@ -87,7 +87,7 @@ private:
         std::function<bool(ValueT &)> pushFunc(
             std::bind(&queue_concurrent<ValueT>::LocalPush, this,
                       std::placeholders::_1));
-        std::function<bool(ValueT &)> popFunc(
+        std::function<std::pair<bool,ValueT>(void)> popFunc(
             std::bind(&queue_concurrent<ValueT>::LocalPop, this));
 
         rpc->bind(func_prefix + "_Push", pushFunc);
