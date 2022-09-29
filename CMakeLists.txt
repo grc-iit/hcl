@@ -4,8 +4,7 @@ project(hcl VERSION 1.0.0 DESCRIPTION "HCL: A library for flexible distributed d
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-2 -g3 -lm -lc -ldl -pthread -Wno-return-type")
-set(RPC_LIB_FLAGS "")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-2 -g3 -lm -lc -ldl -pthread")
 include_directories(${CMAKE_PREFIX_PATH}/include)
 add_definitions(-w)
 option(HCL_ENABLE_RPCLIB "allow hcl to use RPCLIB" OFF)
@@ -79,10 +78,14 @@ if (HCL_ENABLE_RPCLIB)
     set(RPC_LIB_FLAGS rpclib::rpc ${RPC_LIB_FLAGS})
 endif ()
 if (HCL_ENABLE_THALLIUM_ROCE OR HCL_ENABLE_THALLIUM_TCP)
-    find_package(thallium REQUIRED)
+	find_package(thallium COMPONENTS ALL)
+    
+    find_package(Boost COMPONENTS ALL)
+    include_directories(${Boost_INCLUDE_DIRS})
     include_directories(${THALLIUM_INCLUDE_DIRS})
     set(RPC_LIB_FLAGS thallium ${RPC_LIB_FLAGS})
 endif ()
+
 
 find_package(MPI REQUIRED COMPONENTS CXX C)
 if (MPI_FOUND)
