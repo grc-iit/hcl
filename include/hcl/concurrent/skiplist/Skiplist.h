@@ -221,6 +221,8 @@ class Skiplist
 		{
 		    skipnode<K,T> *n1 = n->nlink.load();
 		    boost::shared_lock<boost::upgrade_mutex> lk(n1->node_lock);
+		    lk0.unlock();
+		    lk0.release();
 		    found = Find(lk,n1,k);
 		}
 		else if(n->bottom.load()->isBottomNode())
@@ -232,6 +234,8 @@ class Skiplist
 		{
 		   skipnode<K,T> *b = n->bottom.load();
 		   boost::shared_lock<boost::upgrade_mutex> lk(b->node_lock);
+		   lk0.unlock();
+		   lk0.release();
 		   found = Find(lk,b,k);
 		}
 
