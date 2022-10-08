@@ -1,0 +1,63 @@
+#define BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSIONS
+#define BOOST_THREAD_PROVIDES_EXPLICIT_LOCK_CONVERSION
+#define BOOST_THREAD_PROVIDES_GENERIC_SHARED_MUTEX_ON_WIN
+
+
+#include <iostream>
+#include <type_traits>
+#include "Skiplist.h"
+
+Skiplist<int> *s;
+
+struct thread_arg
+{ 
+   int tid;
+   int num_operations;
+};
+
+void operations(struct thread_arg *t)
+{
+
+	for(int i=0;i<t->num_operations;i++)
+	{
+           int data = random()%10000;
+	   //std::cout <<" tid = "<<t->tid<<" data = "<<data<<std::endl;
+	   bool b = false;
+	   b = s->InsertData(data);
+	   //if(!b) std::cout <<" Not Found data = "<<data<<std::endl;
+	   //std::cout <<" tid = "<<t->tid<<" data end = "<<data<<std::endl;
+	}
+}
+
+
+int main(int argc, char **argv)
+{
+
+   memory_allocator<int> *m = new memory_allocator<int> (100);
+
+   s = new Skiplist<int>(m);
+
+   int num_operations = 1000000;
+
+   int num_threads = 12;
+   int nops = num_operations/num_threads;
+   int rem = num_operations%num_threads;
+
+   std::vector<struct thread_arg> t_args(num_threads);
+   std::vector<std::thread> workers(num_threads);
+
+   for(int i=0;i<num_threads;i++)
+   {
+	 t_args[i].tid = i;
+	 if(i < rem) t_args[i].num_operations = nops+1;
+	 else t_args[i].num_operations = nops;
+	 std::thread t{operations,&t_args[i]};
+	 workers[i] = std::move(t);
+   }
+
+   for(int i=0;i<num_threads;i++)
+	   workers[i].join();
+
+   delete s;
+   delete m;
+}
