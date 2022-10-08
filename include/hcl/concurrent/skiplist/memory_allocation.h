@@ -23,25 +23,25 @@ uint64_t next_power_two(uint64_t n)
    return c;
 }
 
-template<class T>
+template<class K, class T>
 class memory_allocator
 {
    public :
 
    private:
-	 boost::lockfree::queue<skipnode<T>*> *active_queue;
-	 boost::lockfree::queue<skipnode<T>*> *free_queue;
-	 boost::lockfree::queue<skipnode<T>*> *memory_blocks;
+	 boost::lockfree::queue<skipnode<K,T>*> *active_queue;
+	 boost::lockfree::queue<skipnode<K,T>*> *free_queue;
+	 boost::lockfree::queue<skipnode<K,T>*> *memory_blocks;
 	 int csize_;
 
    public:
 	 memory_allocator(int n) : csize_(n)
 	 {
-		active_queue = new boost::lockfree::queue<skipnode<T>*> (128);
-		free_queue = new boost::lockfree::queue<skipnode<T>*> (128);
-		memory_blocks = new boost::lockfree::queue<skipnode<T>*> (128);
+		active_queue = new boost::lockfree::queue<skipnode<K,T>*> (128);
+		free_queue = new boost::lockfree::queue<skipnode<K,T>*> (128);
+		memory_blocks = new boost::lockfree::queue<skipnode<K,T>*> (128);
 
-		skipnode<T> *chunk = new skipnode<T> [csize_];
+		skipnode<K,T> *chunk = new skipnode<K,T> [csize_];
 		for(int i=0;i<csize_;i++)
 		{
 		   active_queue->push(&(chunk[i]));
@@ -54,7 +54,7 @@ class memory_allocator
 		delete active_queue;
 		delete free_queue;
 
-		skipnode<T> *s = nullptr;
+		skipnode<K,T> *s = nullptr;
 		while(memory_blocks->pop(s))
 		{
 			delete [] s;
@@ -63,13 +63,13 @@ class memory_allocator
 
 	 }
 
-	 skipnode<T>* memory_pool_pop()
+	 skipnode<K,T>* memory_pool_pop()
 	 {
-	    skipnode<T> *p = nullptr;
+	    skipnode<K,T> *p = nullptr;
 
 	    while(!active_queue->pop(p))
 	    {
-	      skipnode<T> *r = nullptr;
+	      skipnode<K,T> *r = nullptr;
 	      while(free_queue->pop(r))
 	      {
 		 active_queue->push(r);
@@ -78,7 +78,7 @@ class memory_allocator
 
 	      if(active_queue->pop(p)) break;
 
-	      skipnode<T> *chunk = new skipnode<T> [csize_];
+	      skipnode<K,T> *chunk = new skipnode<K,T> [csize_];
 
 	      for(int i=0;i<csize_;i++)
 	      {
@@ -91,7 +91,7 @@ class memory_allocator
 	    return p;
 	 }
 
-	 void memory_pool_push(skipnode<T> *p)
+	 void memory_pool_push(skipnode<K,T> *p)
 	 {
 	    free_queue->push(p);
 	 }

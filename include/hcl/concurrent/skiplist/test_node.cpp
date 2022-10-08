@@ -7,7 +7,7 @@
 #include <type_traits>
 #include "Skiplist.h"
 
-Skiplist<int> *s;
+Skiplist<int,int> *s;
 
 struct thread_arg
 { 
@@ -20,11 +20,12 @@ void operations(struct thread_arg *t)
 
 	for(int i=0;i<t->num_operations;i++)
 	{
-           int data = random()%10000;
+           int key = random()%10000;
+	   int data = 1;
 	   //std::cout <<" tid = "<<t->tid<<" data = "<<data<<std::endl;
 	   bool b = false;
-	   b = s->InsertData(data);
-	   //if(!b) std::cout <<" Not Found data = "<<data<<std::endl;
+	   b = s->InsertData(key,data);
+	   if(!b) std::cout <<" Not Found data = "<<key<<std::endl;
 	   //std::cout <<" tid = "<<t->tid<<" data end = "<<data<<std::endl;
 	}
 }
@@ -33,11 +34,11 @@ void operations(struct thread_arg *t)
 int main(int argc, char **argv)
 {
 
-   memory_allocator<int> *m = new memory_allocator<int> (100);
+   memory_allocator<int,int> *m = new memory_allocator<int,int> (100);
 
-   s = new Skiplist<int>(m);
+   s = new Skiplist<int,int>(m);
 
-   int num_operations = 1000000;
+   int num_operations = 100000;
 
    int num_threads = 12;
    int nops = num_operations/num_threads;

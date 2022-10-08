@@ -21,19 +21,22 @@ enum : uint32_t
    IS_BOTTOM_NODE = 16,
 };
 
-template<class T>
+template<class K, class T>
 class skipnode
 {
    public:
    boost::upgrade_mutex node_lock;
+   K key_;
    T data_;
    std::atomic<uint32_t> flags_;
-   std::atomic<skipnode<T>*> nlink;
+   std::atomic<skipnode<K,T>*> nlink;
    //std::atomic<struct skipnode<T>*> plink;
-   std::atomic<skipnode<T>*> bottom;
+   std::atomic<skipnode<K,T>*> bottom;
 
    skipnode()
    {
+	new (&key_) K();
+	new (&data_) T();
 	new (&node_lock) boost::upgrade_mutex();
 	nlink.store(nullptr);
 	bottom.store(nullptr);
@@ -52,7 +55,14 @@ class skipnode
     {
        flags_.store(flags);
     }
-        
+    void setKey(K &k)
+    {
+      key_ = k;
+    }
+    K& key()
+    {
+      return key_;
+    }    
     void setData(T &d)
     {
       data_ = d;
@@ -60,14 +70,6 @@ class skipnode
     T& data() 
     { 
        return data_; 
-    }
-    bool fullyLinked()
-    { 
-       return flags_.load() & FULLY_LINKED; 
-    }
-    bool markedForRemoval() 
-    { 
-       return flags_.load() & MARKED_FOR_REMOVAL; 
     }
     bool isHeadNode() 
     { 
@@ -93,15 +95,6 @@ class skipnode
     {
       setFlags(flags_.load() |IS_BOTTOM_NODE);
     }
-    void setFullyLinked() 
-    { 
-       setFlags(flags_.load() | FULLY_LINKED); 
-    }
-    void setMarkedForRemoval() 
-    {
-       setFlags(flags_.load() | MARKED_FOR_REMOVAL);
-    }
-
 };
 
 #endif
