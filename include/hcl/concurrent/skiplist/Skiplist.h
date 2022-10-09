@@ -133,7 +133,7 @@ class Skiplist
 		 {
 		     skipnode<K,T> *n1 = n->nlink.load();
 		     boost::shared_lock<boost::upgrade_mutex> lk2(n1->node_lock);
-		     lk1.unlock();lk1.release();
+		     //lk1.unlock();lk1.release();
 		     found = Insert(lk2,n1,k,data);
 		     return found;
 		 }
@@ -164,11 +164,13 @@ class Skiplist
 				      if(!n3->isTailNode() && !n3->isBottomNode())
 					  boost::upgrade_lock<boost::upgrade_mutex> l4(n3->node_lock);
 
+				         //std::cout <<" data = "<<k<<" nkey = "<<n->key_<<" bkey = "<<n->bottom.load()->key_<<" bn1 = "<<n->bottom.load()->nlink.load()->key_<<" bn2 = "<<n->bottom.load()->nlink.load()->nlink.load()->key_<<" bn3 = "<<n->bottom.load()->nlink.load()->nlink.load()->nlink.load()->key_<<std::endl;
+				         /*if(n->key_ == n->bottom.load()->nlink.load()->nlink.load()->nlink.load()->key_)
+						 std::cout <<" n_key = "<<n->key_<<std::endl;*/
 				    	 add_node(n,k,data);
 				   } 
 				}
 			 }
-			 if(n == head.load()) IncreaseDepth();
 			 }
 
 			 boost::shared_lock<boost::upgrade_mutex> lk3(std::move(lk2));
@@ -176,7 +178,7 @@ class Skiplist
 			 assert(lk2.owns_lock()==false);
 			 b = n->bottom.load();
 			 boost::shared_lock<boost::upgrade_mutex> lk4(b->node_lock);
-			 lk3.unlock();lk3.release();
+			 //lk3.unlock();lk3.release();
 			 found = Insert(lk4,b,k,data);
 			break;
 		      }
@@ -193,18 +195,19 @@ class Skiplist
 	     while(true)
 	     {
 		skipnode<K,T> *n = head.load();
-		boost::shared_lock<boost::upgrade_mutex> lk0(n->node_lock);
-		if(!n->nlink.load()->isTailNode())
+		boost::upgrade_lock<boost::upgrade_mutex> lk(n->node_lock);
+		if(n==head.load()) 
 		{
-		   lk0.unlock();
-		   lk0.release();
-		}
-		else
-		{
+		   IncreaseDepth();
+		   boost::shared_lock<boost::upgrade_mutex> lk0(std::move(lk));
 		   b = Insert(lk0,n,k,data);
 		   break;
 		}
-	     }	
+		else
+		{
+		   lk.unlock(); lk.release();
+		}
+	     }
 
 	     return b;
 	  }
@@ -262,20 +265,20 @@ class Skiplist
 	      }
 	      return b;
 	  }
-	  /*void check_list()
+	  void check_list()
 	  {
-		skipnode<T> *t = head.load();
-		assert (t->nlink.load()->isTailNode());
+		skipnode<K,T> *t = head.load();
+		//assert (t->nlink.load()->isTailNode());
 
-		skipnode<T> *b = head.load();
-		std::cout <<" level = "<<0<<" b data = "<<b->data_<<std::endl;
+		skipnode<K,T> *b = head.load();
+		std::cout <<" level = "<<0<<" b data = "<<b->key_<<" l data = "<<b->bottom.load()->key_<<std::endl;
 	
 	        b = head.load()->bottom.load();
 		std::cout <<" level = "<<1<<std::endl;
 
 		while(!b->isTailNode())
 		{
-			std::cout <<" b data = "<<b->data_<<std::endl;
+			std::cout <<" b data = "<<b->key_<<" l data = "<<b->bottom.load()->key_<<std::endl;
 			b = b->nlink.load();
 		}
 
@@ -284,11 +287,27 @@ class Skiplist
 		std::cout <<" level = "<<2<<std::endl;
 		while(!b->isTailNode())
 		{
-			std::cout <<" b data = "<<b->data_<<std::endl;
+			if(b->isBottomNode()) break;
+			if(b->key_ == b->bottom.load()->key_) assert(b->bottom.load()->isBottomNode());
+			std::cout <<" b data = "<<b->key_<<" l data = "<<b->bottom.load()->key_<<std::endl;
 			b = b->nlink.load();
-		}	
+		
+		}
 
-	  }*/ 
+		std::cout <<" level = "<<3<<std::endl;
+		
+		b = head.load()->bottom.load()->bottom.load()->bottom.load();
+
+		while(!b->isTailNode())
+		{
+		   if(b->isBottomNode()) break;
+		   if(b->key_==b->bottom.load()->key_) assert(b->bottom.load()->isBottomNode());
+		   std::cout <<" b data = "<<b->key_<<" l data = "<<b->bottom.load()->key_<<std::endl;
+		   b = b->nlink.load();
+		}
+
+
+	  }
 
 };
 
