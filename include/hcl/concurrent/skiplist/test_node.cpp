@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 4;
+   int num_operations = 1000000;
 
    int num_threads = 12;
    int nops = num_operations/num_threads;

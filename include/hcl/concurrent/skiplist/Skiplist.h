@@ -180,12 +180,14 @@ class Skiplist
 	  {
 		 bool found = false;
 
+		 if(n!=head.load() && n->bottom.load()->isBottomNode()) return false;
+
 		 if((k > n->key_))
 		 {
 		     skipnode<K,T> *n1 = n->nlink.load();
 		     boost::shared_lock<boost::upgrade_mutex> lk2(n1->node_lock);
-		     //lk1.unlock();lk1.release();
 		     if(n==head.load() && !ValidHead()) return false;
+		     lk1.unlock(); lk1.release();
 		     found = Insert(lk2,n1,k,data);
 		     return found;
 		 }
@@ -240,8 +242,7 @@ class Skiplist
 			 b = n->bottom.load();
 			 boost::shared_lock<boost::upgrade_mutex> lk4(b->node_lock);
 			 if(n==head.load() && !ValidHead()) return false;
-			 //lk3.unlock();lk3.release();
-			 //if(!ValidHead()) return false;
+			 lk3.unlock();lk3.release();
 			 if(!isLeafNode(b))
 			 found = Insert(lk4,b,k,data);
 			break;
@@ -265,6 +266,7 @@ class Skiplist
 	       }
              }
 
+	     //if(!b)
 	     {
 		skipnode<K,T> *n = head.load();
 		boost::upgrade_lock<boost::upgrade_mutex> lk0(n->node_lock);
