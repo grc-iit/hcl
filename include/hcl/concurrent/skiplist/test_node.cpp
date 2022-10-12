@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 1000000;
+   int num_operations = 10000000;
 
    int num_threads = 12;
    int nops = num_operations/num_threads;
@@ -59,6 +59,7 @@ int main(int argc, char **argv)
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
+   std::cout <<" check list"<<std::endl;
    s->check_list();
 
    delete s;
