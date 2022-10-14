@@ -269,7 +269,6 @@ class Skiplist
 			    boost::shared_lock<boost::upgrade_mutex> lk4(b->node_lock);
 			    if(n==head.load() && !ValidHead()) return false;
 			    lk3.unlock();lk3.release();
-			    if(!isLeafNode(b))
 			    found = Insert(lk4,b,k,data);
 			 }
 			break;
