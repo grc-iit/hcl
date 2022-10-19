@@ -25,11 +25,11 @@ void operations(struct thread_arg *t)
 	   //std::cout <<" tid = "<<t->tid<<" data = "<<data<<std::endl;
 	   bool b = false;
 	   b = s->InsertData(key,data);
-	   if(b) 
+	   /*if(b) 
 	   {
 	      b = s->FindData(key);
 
-	   }
+	   }*/
 	   //if(!b) std::cout <<" Not Found data = "<<key<<std::endl;
 	   //std::cout <<" tid = "<<t->tid<<" data end = "<<data<<std::endl;
 	}

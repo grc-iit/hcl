@@ -230,31 +230,39 @@ class Skiplist
 		          if(b->isBottomNode()){ b->key_ = k; b->data_ = data;}
 			  {
 				skipnode<K,T> *n1 = b->nlink.load();
-				if(!b->isBottomNode() && !n1->isTailNode() && n1->key_ <= n->key_)
-				   boost::upgrade_lock<boost::upgrade_mutex> l2(n1->node_lock);
 				{
-				   skipnode<K,T> *n2 = n1->nlink.load();
-				   if(!n2->isTailNode() && !n2->isBottomNode() && n2->key_ <= n->key_)
-				      boost::upgrade_lock<boost::upgrade_mutex> l3(n2->node_lock);
+				   if(!b->isBottomNode() && !n1->isTailNode())
+				   boost::upgrade_lock<boost::upgrade_mutex> l2(n1->node_lock);
+				  
 
+				   skipnode<K,T> *n2 = n1->nlink.load();
 				   {
-				      skipnode<K,T> *n3 = n2->nlink.load();
-				      if(!n3->isTailNode() && !n3->isBottomNode() && n3->key_ <= n->key_)
-					  boost::upgrade_lock<boost::upgrade_mutex> l4(n3->node_lock);
+				     if(!n2->isBottomNode() && !n2->isTailNode() && n2 != n1 && n1->key_ < n->key_)
+				     boost::upgrade_lock<boost::upgrade_mutex> l3(n2->node_lock);
+
+				     skipnode<K,T> *n3 = n2->nlink.load();
+				     {
+				       if(!n3->isBottomNode() && !n3->isTailNode() && n3 != n2 && n2->key_ < n->key_)
+				       boost::upgrade_lock<boost::upgrade_mutex> l4(n3->node_lock);
 
 					  //std::cout <<" add node data = "<<k<<" n = "<<n<<" head = "<<head.load()<<std::endl;
 					 //std::cout <<" nb = "<<b->key_<<" nbd = "<<b->bottom.load()->key_<<std::endl;
-					 if(!b->isBottomNode() && b->bottom.load()->isBottomNode())
-					 {
+				       if(!b->isBottomNode() && b->bottom.load()->isBottomNode())
+				       {
 					     //std::cout <<" n = "<<n<<" n data = "<<n->key_<<" head = "<<head.load()<<" b data = "<<b->key_<<" add leaf node data = "<<k<<std::endl;
 					     found = addleafnode(n,k,data);
 					     //if(!found) std::cout <<" n = "<<n<<" head = "<<head.load()<<" node not added data = "<<k<<std::endl;
-					 }
+				       }
 					 //std::cout <<" add node data = "<<k<<std::endl;
-				    	 add_node(n,k,data);
-					 p = n->key_;
-					 if(found) return true;
-				   } 
+				        add_node(n,k,data);
+				        p = n->key_;
+				   /*for(int i=0;i<4;i++)
+				   {
+					if(node_array[i]!=nullptr) node_array[i]->release();
+				   }*/
+				        if(found) return true;
+				     }
+				   }
 				}
 			 }
 			 }
