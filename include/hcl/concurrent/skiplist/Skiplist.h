@@ -229,30 +229,19 @@ class Skiplist
 			  skipnode<K,T> *t = n->nlink.load();
 			  if(k <= c)
 			  {
-			     int numnodes=0;
 
-			     if(!b->isBottomNode())
-			     {
-				 skipnode<K,T> *p_n = b;
-
-				 while(true)
-				 {
-				    numnodes++;
-				    if(p_n->key_ == n->key_) break;
-				    p_n = p_n->nlink.load();
-				 }
-			     }
-			     else numnodes=1;
-
-			 boost::upgrade_lock<boost::upgrade_mutex> *array[numnodes];
+			 std::vector<boost::upgrade_lock<boost::upgrade_mutex> *> array;
 
 			 skipnode<K,T> *p_n = b;
-			 for(int i=0;i<numnodes;i++) 
+			
+			 for(;;)
 			 {
-			    array[i] = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+			    boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+			    array.push_back(tmp);
+			    if(p_n->key_ == n->key_|| p_n->isBottomNode()) break;
 			    p_n = p_n->nlink.load();
 			 }
-			 
+
 		          if(b->isBottomNode()){ b->key_ = k; b->data_ = data;}
 			     
 			  bool f = add_node(n,k,data);
@@ -265,7 +254,7 @@ class Skiplist
 			  }
 			  p = n->key_;
 			  
-			  for(int i=0;i<numnodes;i++)
+			  for(int i=0;i<array.size();i++)
 			  {
 				  assert (array[i]->owns_lock());
 				  delete array[i];
