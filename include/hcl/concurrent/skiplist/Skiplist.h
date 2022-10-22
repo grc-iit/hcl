@@ -347,7 +347,7 @@ class Skiplist
 		return numnodes;
 	  }
 
-	  bool drop_key(skipnode<K,T> *n,K &k)
+	  bool drop_key(skipnode<K,T> *n,K &k,std::vector<skipnode<K,T>*> &deleted_nodes)
 	  {
 	        std::vector<skipnode<K,T> *> nodes;
 	        skipnode<K,T> *t = n->bottom.load();
@@ -374,6 +374,28 @@ class Skiplist
 		{
 		   int numnodes = nodes[pos]->bottom.load()->isBottomNode() ? 0 : getnumnodes(nodes[pos]);
 
+		   std::vector<boost::upgrade_lock<boost::upgrade_mutex>*> n1_locks, n2_locks;
+
+		   skipnode<K,T> *p_n = nodes[pos]->bottom.load();
+
+		   for(;;)
+		   {
+		     boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+		     n1_locks.push_back(tmp);
+		     if(p_n->key_ == nodes[pos]->key_ || p_n->isBottomNode()) break;
+		     p_n = p_n->nlink.load();
+		   }
+
+		   p_n = nodes[pos+1]->bottom.load();
+
+		   for(;;)
+		   {
+		     boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+		     n2_locks.push_back(tmp);
+		     if(p_n->key_ == nodes[pos+1]->key_ || p_n->isBottomNode()) break;
+		     p_n = p_n->nlink.load();
+		   }
+
 		   if(numnodes > 2)
 		   {
 		      t = nodes[pos]->bottom.load();
@@ -393,7 +415,13 @@ class Skiplist
 		   {
 			nodes[pos]->key_ = nodes[pos+1]->key_;
 			nodes[pos]->nlink.store(nodes[pos+1]->nlink.load());
+			deleted_nodes.push_back(nodes[pos+1]);
+
 		   }
+
+		   for(int i=0;i<n1_locks.size();i++) delete n1_locks[i];
+		   for(int i=0;i<n2_locks.size();i++) delete n2_locks[i];
+
 
 		}
 	
@@ -402,7 +430,7 @@ class Skiplist
 	
 	  }
 
-	  bool merge_borrow_nodes(skipnode<K,T>*n1, skipnode<K,T> *n2)
+	  bool merge_borrow_nodes(skipnode<K,T>*n1, skipnode<K,T> *n2,std::vector<skipnode<K,T>*> &deleted_nodes)
 	  {
 		std::vector<skipnode<K,T>*> n1nodes, n2nodes;
 
@@ -431,6 +459,7 @@ class Skiplist
 			if(n2nodes.size()<3)
 			{
 			   n1->key_ = n1->nlink.load()->key_;
+			   deleted_nodes.push_back(n1->nlink.load());
 			   n1->nlink.store(n1->nlink.load()->nlink.load());
 			}
 			else
@@ -445,6 +474,7 @@ class Skiplist
 			     else
 			     {
 				n1->key_ = n1->nlink.load()->key_;
+				deleted_nodes.push_back(n1->nlink.load());
 				n1->nlink.store(n1->nlink.load()->nlink.load());
 			     }
 			  }
@@ -483,6 +513,7 @@ class Skiplist
 			if(n1nodes.size() < 3)
 			{
 			    n1->key_ = n2->key_;
+			    deleted_nodes.push_back(n2);
     			    n1->nlink.store(n2->nlink.load());			    
 			}
 			else
@@ -497,6 +528,7 @@ class Skiplist
 				else
 				{
 				   n1->key_ = n2->key_;
+				   deleted_nodes.push_back(n2);
 				   n1->nlink.store(n2->nlink.load());
 				}
 			   }
@@ -515,39 +547,151 @@ class Skiplist
 
 	  }
 
-	  bool EraseSeq(skipnode<K,T> *n1,skipnode<K,T> *n2, K&k)
+	  void acquire_locks(skipnode<K,T> *n1, skipnode<K,T> *n2, std::vector<boost::upgrade_lock<boost::upgrade_mutex> *> &n1_locks, std::vector<boost::upgrade_lock<boost::upgrade_mutex> *> &n2_locks,std::vector<skipnode<K,T>*> &n1_node_ptrs, std::vector<skipnode<K,T>*> &n2_node_ptrs)
+	  {
+
+		if(n1==n2)
+		{
+		   skipnode<K,T> *b = n1->bottom.load();
+		   skipnode<K,T> *p_n = b;
+
+		   for(;;)
+		   {
+		      boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+		      n1_locks.push_back(tmp);
+		      n1_node_ptrs.push_back(p_n);
+		      if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
+		      p_n = p_n->nlink.load();
+		   }
+
+		   b = n1->nlink.load();
+
+		   if(!b->isTailNode())
+		   {
+			p_n = b->bottom.load();
+
+			for(;;)
+			{
+			   boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+			   n2_locks.push_back(tmp);
+			   n2_node_ptrs.push_back(p_n);
+			   if(p_n->key_ == b->key_ || p_n->isBottomNode()) break;
+			   p_n = p_n->nlink.load();
+			}
+		   }
+		}
+		else
+		{
+		   skipnode<K,T> *b = n1->bottom.load();
+		   skipnode<K,T> *p_n = b;
+
+		   for(;;)
+		   {
+		      boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+		      n1_locks.push_back(tmp);
+		      n1_node_ptrs.push_back(p_n);
+		      if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
+		      p_n = p_n->nlink.load();
+		   }
+
+		   b = n2->bottom.load();
+		   p_n = b;
+
+		   for(;;)
+		   {
+		      boost::upgrade_lock<boost::upgrade_mutex> *tmp = new boost::upgrade_lock<boost::upgrade_mutex> (p_n->node_lock);
+		      n2_locks.push_back(tmp);
+		      n2_node_ptrs.push_back(p_n);
+		      if(p_n->key_ == n2->key_ || p_n->isBottomNode()) break;
+		      p_n = p_n->nlink.load();
+		   }
+
+		}
+
+	  }
+
+	  void find_nodes(std::vector<skipnode<K,T>*> &n1_node_ptrs, std::vector<skipnode<K,T>*> &n2_node_ptrs, std::vector<skipnode<K,T>*> &nodes, int &pos1, int &pos2, std::vector<int> &npos1,std::vector<int> &npos2)
+	  {
+
+                   for(int i=0;i<n1_node_ptrs.size();i++)
+                   {
+                      if(n1_node_ptrs[i]==nodes[pos1])
+                      {
+                          npos1[0]=i;
+                      }
+                      if(n1_node_ptrs[i]==nodes[pos2])
+                      {
+                          npos1[1]=i;
+                      }
+                   }
+
+		   int npos21 = -1, npos22 = -1;
+                   for(int i=0;i<n2_node_ptrs.size();i++)
+                   {
+                       if(n2_node_ptrs[i]==nodes[pos1])
+                       {
+                          npos2[0] = i;
+                       }
+                       if(n2_node_ptrs[i]==nodes[pos2])
+                       {
+                          npos2[1] = i;
+                       }
+                   }
+
+
+	  }
+
+	  bool Erase(boost::upgrade_lock<boost::upgrade_mutex> &lk0, boost::upgrade_lock<boost::upgrade_mutex> &lk1, skipnode<K,T> *n1,skipnode<K,T> *n2, K&k)
 	  {
 	       bool found = false;
 
-	       if(n1->isBottomNode() || n1->isTailNode() || n2->isBottomNode() || n2->isTailNode()) return false;
+	       if(n1->isBottomNode() || n1->isTailNode() || n2->isBottomNode() || n2->isTailNode()) 
+	       {
+		       lk0.release(); if(n1 != head.load()) lk1.release();
+		       return false;
+	       }
 
 	       if(!n1->bottom.load()->isBottomNode())
 	       {
+		  std::vector<boost::upgrade_lock<boost::upgrade_mutex> *> n1_locks, n2_locks;
+		  std::vector<skipnode<K,T>*> n1_node_ptrs, n2_node_ptrs;
+
+		  acquire_locks(n1,n2,n1_locks,n2_locks,n1_node_ptrs,n2_node_ptrs);
+
+		  std::cout <<" n = "<<n1->key_<<" k = "<<k<<std::endl;
+		  std::vector<skipnode<K,T>*> nodes;
+		  int pos = -1;
+		  bool dropped = false;
+
 		  if(n1==n2)
 		  {
 			K key_p = n1->key_;
-			bool dropped = false;
+			dropped = false;
+			std::vector<skipnode<K,T>*> nodes_d;
+			std::vector<skipnode<K,T>*> nodes_m;
 			if(n1==head.load())
 			{
-			    bool d = drop_key(n1,k);
+			    bool d = drop_key(n1,k,nodes_d);
 			    dropped = d;
 
+			    std::cout <<" dn = "<<n1->key_<<" k = "<<k<<" dropped = "<<dropped<<std::endl;
 			    if(n1->bottom.load()->key_ == n1->key_)
 			    {
+				for(int i=0;i<n1_locks.size();i++) delete n1_locks[i];
+				lk0.release();
 				return false; 
 			    }
 
 			}
 			else
-			{	
-			    bool d = drop_key(n1,k);
+			{
+				
+			    bool d = drop_key(n1,k,nodes_d);
 			    dropped = d;
 
-			    d = merge_borrow_nodes(n1,n2);
+			    d = merge_borrow_nodes(n1,n2,nodes_m);
 
 			}
-
-			std::vector<skipnode<K,T>*> nodes;
 
 			skipnode<K,T> *t = n1->bottom.load();
 
@@ -558,8 +702,6 @@ class Skiplist
 			   t=t->nlink.load();
 			}
 			
-			int pos = -1;
-
 			for(int i=0;i<nodes.size();i++)
 			{
 				if(nodes[i]->key_ > k)
@@ -568,32 +710,25 @@ class Skiplist
 				   break;
 				}
 			}
-
-			
-			//std::cout <<" n = "<<nodes[pos]->key_<<" k = "<<k<<" pos = "<<pos<<" n = "<<n1->key_<<std::endl;
-			if(!nodes[pos]->bottom.load()->isBottomNode())
-			{
-			   if(pos==0) found = EraseSeq(nodes[pos],nodes[pos],k);
-			   else found = EraseSeq(nodes[pos-1],nodes[pos],k);
-			}
-			else return dropped;
-
+			std::cout <<" n = "<<n1->key_ <<" k = "<<k<<" pos = "<<pos<<std::endl;
 		  }
 		  else 
 		  {
 
-			bool dropped = false;
-			bool d = drop_key(n2,k);
+			std::vector<skipnode<K,T>*> nodes_d;
+			std::vector<skipnode<K,T>*> nodes_m;
+
+			dropped = false;
+			bool d = drop_key(n2,k,nodes_d);
 			dropped = d;
 
 			K n1_key = n1->key_;
 			K n2_key = n2->key_;
 
-			d = merge_borrow_nodes(n1,n2);
+			d = merge_borrow_nodes(n1,n2,nodes_m);
 			
 			if(n1->key_ > n1_key)
 			{
-			   std::vector<skipnode<K,T>*> nodes;
 			   skipnode<K,T> *t = n1->bottom.load();
 
 			   while(true)
@@ -603,7 +738,6 @@ class Skiplist
 			      t = t->nlink.load();
 			   }
 
-			   int pos = -1;
 			   for(int i=0;i<nodes.size();i++)
 			   {
 				   if(nodes[i]->key_ > k)
@@ -611,18 +745,9 @@ class Skiplist
 					 pos = i; break;
 				   }
 			   }
-
-			   if(!nodes[pos]->bottom.load()->isBottomNode())
-			   {
-			     if(pos==0) found = EraseSeq(nodes[pos],nodes[pos],k);
-			     else found = EraseSeq(nodes[pos-1],nodes[pos],k);
-			   }
-			   else return dropped;
-
 			}
 			else
 			{
-			    std::vector<skipnode<K,T>*> nodes;
 			    skipnode<K,T> *t = n2->bottom.load();
 
 			    while(true)
@@ -632,7 +757,6 @@ class Skiplist
 				t = t->nlink.load();
 			    }
 
-			    int pos = -1;
 			    for(int i=0;i<nodes.size();i++)
 			    {
 				    if(nodes[i]->key_ > k)
@@ -640,33 +764,62 @@ class Skiplist
 					 pos = i; break;
 				    }
 			    }
-
-			    if(!nodes[pos]->bottom.load()->isBottomNode())
-			    {
-			       if(pos == 0) found = EraseSeq(nodes[pos],nodes[pos],k);
-			       else found = EraseSeq(nodes[pos-1],nodes[pos],k);
-			    }
-			    else return dropped;
-
 			}
-			
-
 		  }
+		  std::cout <<" nodes = "<<nodes.size()<<" pos = "<<pos<<std::endl;	
 
-	       }
+		  if(!nodes[pos]->bottom.load()->isBottomNode())
+	          {
+		     int pos1, pos2;
+		     if(pos==0)
+		     {
+			pos1 = pos; pos2 = pos+1;
+		     }
+		     else
+	             {
+			pos1 = pos-1; pos2 = pos;
+		     }
 
-		return found;
+		     std::cout <<" pos1 = "<<pos1<<" pos2 = "<<pos2<<std::endl;
+		     std::vector<int> npos1,npos2;
+                     npos1.resize(2);npos2.resize(2);
+                     std::fill(npos1.begin(),npos1.end(),-1);
+                     std::fill(npos2.begin(),npos2.end(),-1);
+                     find_nodes(n1_node_ptrs, n2_node_ptrs, nodes,pos1,pos2,npos1,npos2);
 
-	  }
+                     boost::upgrade_lock<boost::upgrade_mutex> *t1, *t2;
+                     if(npos1[0] != -1) t1 = n1_locks[npos1[0]];
+                     if(npos1[1] != -1) t2 = n1_locks[npos1[1]];
+                     if(npos2[0] != -1) t1 = n2_locks[npos2[0]];
+                     if(npos2[1] != -1) t2 = n2_locks[npos2[1]];
 
-
-	  bool Erase(boost::upgrade_lock<boost::upgrade_mutex> &lk0, boost::upgrade_lock<boost::upgrade_mutex> &lk1, skipnode<K,T> *n1, skipnode<K,T> *n2, K& k)
-	  {
-		bool found = false;
-
-		return found;
+                     boost::upgrade_lock<boost::upgrade_mutex> lk11(std::move(*t1));
+                     boost::upgrade_lock<boost::upgrade_mutex> lk22(std::move(*t2));
 		
-	  }
+		     for(int i=0;i<n1_locks.size();i++) delete n1_locks[i];
+		     for(int i=0;i<n2_locks.size();i++) delete n2_locks[i];
+		     lk0.release(); if(n1!=head.load()) lk1.release();
+		     if(pos==0)
+		     {
+			found = Erase(lk11,lk22,nodes[pos],nodes[pos],k);
+		     }
+		     else found = Erase(lk11,lk22,nodes[pos-1],nodes[pos],k);
+
+		}
+		else 
+		{
+		    for(int i=0;i<n1_locks.size();i++) delete n1_locks[i];
+		    for(int i=0;i<n2_locks.size();i++) delete n2_locks[i];
+			lk0.release(); if(n1 != head.load()) lk1.release();
+			  return dropped;
+		}
+
+	}
+			
+	return found;
+
+    }
+
 
 	  bool EraseData(K &k)
 	  {
@@ -677,7 +830,8 @@ class Skiplist
 		{
 		   b = Erase(lk0,lk0,n,n,k);
 		}*/
-		b = EraseSeq(n,n,k);
+		boost::upgrade_lock<boost::upgrade_mutex> lk0(n->node_lock);
+		b = Erase(lk0,lk0,n,n,k);
 
 		DecreaseDepth();
 
