@@ -20,16 +20,16 @@ void operations(struct thread_arg *t)
 
 	for(int i=0;i<t->num_operations;i++)
 	{
-           int key = random()%10000;
+           int key = i+1;
 	   int data = 1;
 	   //std::cout <<" tid = "<<t->tid<<" data = "<<data<<std::endl;
 	   bool b = false;
 	   b = s->InsertData(key,data);
-	   /*if(b) 
+	   if(b) 
 	   {
 	      b = s->FindData(key);
 
-	   }*/
+	   }
 	   //if(!b) std::cout <<" Not Found data = "<<key<<std::endl;
 	   //std::cout <<" tid = "<<t->tid<<" data end = "<<data<<std::endl;
 	}
@@ -43,9 +43,9 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 100000;
+   int num_operations = 1000;
 
-   int num_threads = 12;
+   int num_threads = 1;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
 
@@ -64,7 +64,16 @@ int main(int argc, char **argv)
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
+    
    std::cout <<" check list"<<std::endl;
+   s->check_list();
+
+   for(int i=0;i<995;i++)
+   {
+	  int data = i+1;
+	  s->EraseData(data);
+   }
+
    s->check_list();
 
    delete s;
