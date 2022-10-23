@@ -441,7 +441,7 @@ class Skiplist
 		    while(true)
 		    {  
 			  n1nodes.push_back(t);
-			  if(t->key_==n1->key_) break;
+			  if(t->key_==n1->key_ || t->isBottomNode()) break;
 			  t = t->nlink.load();
 		    }
 
@@ -450,7 +450,7 @@ class Skiplist
 		    while(true)
 		    {
 			n2nodes.push_back(t);
-			if(t->key_ == n1->nlink.load()->key_) break;
+			if(t->key_ == n1->nlink.load()->key_ || t->isBottomNode()) break;
 			t = t->nlink.load();
 		    }
 
@@ -495,7 +495,7 @@ class Skiplist
 		    while(true)
 		    {
 			n1nodes.push_back(t);
-		        if(t->key_ == n1->key_) break;
+		        if(t->key_ == n1->key_||t->isBottomNode()) break;
 			t = t->nlink.load();
 		    }
 
@@ -504,7 +504,7 @@ class Skiplist
 		    while(true)
 		    {
 			n2nodes.push_back(t);
-	    		if(t->key_ == n2->key_) break;
+	    		if(t->key_ == n2->key_||t->isBottomNode()) break;
 			t = t->nlink.load();
 		    }		
 
@@ -645,11 +645,24 @@ class Skiplist
 	  {
 	       bool found = false;
 
-	       if(n1->isBottomNode() || n1->isTailNode() || n2->isBottomNode() || n2->isTailNode()) 
+	       if(n1->isBottomNode() || n1->isTailNode() || n2->isBottomNode() || n2->isTailNode() || (n1==head.load() && !ValidHead())) 
 	       {
-		       lk0.release(); lk1.release();
+		       lk0.unlock(); lk0.release(); 
+		       if(n1 != head.load()) 
+		       {
+			   lk1.unlock(); lk1.release();
+		       }
 		       return false;
 	       }
+
+	       if(n1->bottom.load()->isBottomNode())
+	       {
+		  lk0.unlock(); lk0.release();
+		  if(n1 != head.load())
+		  {
+		     lk1.unlock(); lk1.release();
+		  }
+	       } 
 
 	       if(!n1->bottom.load()->isBottomNode())
 	       {
@@ -765,7 +778,7 @@ class Skiplist
 			}
 		  }
 
-		  if(!nodes[pos]->bottom.load()->isBottomNode())
+		  if(pos != -1 && !nodes[pos]->bottom.load()->isBottomNode())
 	          {
 		     int pos1, pos2;
 		     if(pos==0)
@@ -783,12 +796,13 @@ class Skiplist
                      std::fill(npos2.begin(),npos2.end(),-1);
                      find_nodes(n1_node_ptrs, n2_node_ptrs, nodes,pos1,pos2,npos1,npos2);
 
-                     boost::upgrade_lock<boost::upgrade_mutex> *t1, *t2;
+                     boost::upgrade_lock<boost::upgrade_mutex> *t1 = nullptr, *t2=nullptr;
                      if(npos1[0] != -1) t1 = n1_locks[npos1[0]];
                      if(npos1[1] != -1) t2 = n1_locks[npos1[1]];
                      if(npos2[0] != -1) t1 = n2_locks[npos2[0]];
                      if(npos2[1] != -1) t2 = n2_locks[npos2[1]];
 
+		     assert (t1 != nullptr && t2 != nullptr);
                      boost::upgrade_lock<boost::upgrade_mutex> lk11(std::move(*t1));
                      boost::upgrade_lock<boost::upgrade_mutex> lk22(std::move(*t2));
 		
@@ -829,12 +843,14 @@ class Skiplist
 	  {
 		skipnode<K,T> *n = head.load();
 		bool b = false;
-		std::cout <<" k = "<<k<<" n = "<<n<<std::endl;
 		boost::upgrade_lock<boost::upgrade_mutex> lk0(n->node_lock);
 		b = Erase(lk0,lk0,n,n,k);
 		if(lk0.owns_lock()) std::cout <<" k = "<<k<<" n = "<<n<<" owns lock"<<std::endl;
 
-		DecreaseDepth();
+
+		n = head.load();
+		boost::upgrade_lock<boost::upgrade_mutex> lk1(n->node_lock);
+          	DecreaseDepth();
 
 		return b;
 	  }

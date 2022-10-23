@@ -18,6 +18,7 @@ struct thread_arg
 void operations(struct thread_arg *t)
 {
 
+	
 	for(int i=0;i<t->num_operations;i++)
 	{
            int key = i+1;
@@ -28,13 +29,27 @@ void operations(struct thread_arg *t)
 	   if(b) 
 	   {
 	      b = s->FindData(key);
+	      //b = s->EraseData(key);
 
 	   }
 	   //if(!b) std::cout <<" Not Found data = "<<key<<std::endl;
 	   //std::cout <<" tid = "<<t->tid<<" data end = "<<data<<std::endl;
 	}
+
 }
 
+void erase_ops(struct thread_arg *t)
+{
+     for(int i=0;i<t->num_operations;i++)
+     {
+	  int key = random()%10000;
+	  int data = 1;
+
+	  bool b = false;
+	  b = s->FindData(key);
+	  if(b) b = s->EraseData(key);
+     }
+}
 
 int main(int argc, char **argv)
 {
@@ -43,8 +58,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 1000;
-
+   int num_operations = 10000;
    int num_threads = 1;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
@@ -64,16 +78,25 @@ int main(int argc, char **argv)
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
-    
-   std::cout <<" check list"<<std::endl;
-   s->check_list();
+   num_operations = 1000;
+   num_threads = 12;
+   nops = num_operations/num_threads;
+   rem = num_operations%num_threads;
+   t_args.resize(num_threads);
+   workers.resize(num_threads);
 
-   for(int i=0;i<995;i++)
+   for(int i=0;i<num_threads;i++)
    {
-	  int data = i+1;
-	  s->EraseData(data);
+	t_args[i].tid = i;
+	if(i < rem) t_args[i].num_operations = nops+1;
+	else t_args[i].num_operations = nops;
+	std::thread t{erase_ops,&t_args[i]};
+	workers[i] = std::move(t);
    }
 
+   for(int i=0;i<num_threads;i++)
+	   workers[i].join();
+    
    s->check_list();
 
    delete s;
