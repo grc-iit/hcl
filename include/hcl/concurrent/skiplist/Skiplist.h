@@ -880,34 +880,79 @@ class Skiplist
 
 	  std::vector<K> & RangeSearch(K&,K&);
 
-	  bool Find(boost::shared_lock<boost::upgrade_mutex> &lk0, skipnode<K,T> *n, K &k)
+	  bool Find(skipnode<K,T> *n, K &k)
 	  {
 		bool found = false;
 
-		if(n->isBottomNode() || n->isTailNode()) found = false;
-
-		if(n==head && !ValidHead()) return false;
-
-		if(k > n->key_)
+		if(n->isBottomNode() || n->isTailNode()) 
 		{
-		    skipnode<K,T> *n1 = n->nlink.load();
-		    boost::shared_lock<boost::upgrade_mutex> lk(n1->node_lock);
-		    lk0.unlock();
-		    lk0.release();
-		    found = Find(lk,n1,k);
+			n->node_lock.unlock();
+			found = false;
 		}
-		else if(n->bottom.load()->isBottomNode())
+
+		if(n==head && !ValidHead()) 
 		{
-		   if(k == n->key_) found = true;
-		   else found = false;
+			n->node_lock.unlock();
+			return false;
 		}
-		else 
+
+		std::vector<skipnode<K,T>*> nodes;
+
+		skipnode<K,T> *p_n = n->bottom.load();
+	
+		int pos = -1;
+
+		if(p_n != n)
 		{
-		   skipnode<K,T> *b = n->bottom.load();
-		   boost::shared_lock<boost::upgrade_mutex> lk(b->node_lock);
-		   lk0.unlock();
-		   lk0.release();
-		   found = Find(lk,b,k);
+		    for(;;)
+		    {
+			p_n->node_lock.lock();
+			nodes.push_back(p_n);
+			if(p_n->key_==n->key_ || p_n->isBottomNode()) break;
+			p_n = p_n->nlink.load();
+		    }
+		}
+
+		for(int i=0;i<nodes.size();i++)
+		{
+			if(k <= nodes[i]->key_)
+			{
+			   pos = i; break;
+			}
+		}
+
+		if(pos!=-1)
+		{
+		    if(nodes[pos]->bottom.load()->isBottomNode())
+		    {
+
+			if(nodes[pos]->key_ == k) 
+			{
+				found = true;
+			}
+			else found = false;
+			for(int i=0;i<nodes.size();i++)
+			  nodes[i]->node_lock.unlock();
+			n->node_lock.unlock();
+			return found;
+
+		    }
+		    else
+		    {
+			for(int i=0;i<nodes.size();i++)
+			{
+				if(i != pos) nodes[i]->node_lock.unlock();
+			}
+			n->node_lock.unlock();
+			found = Find(nodes[pos],k);
+		    }
+		}
+		else
+		{
+			for(int i=0;i<nodes.size();i++)
+				nodes[i]->node_lock.unlock();
+			n->node_lock.unlock();
+			return false;
 		}
 
 		return found;
@@ -915,22 +960,13 @@ class Skiplist
 	  bool FindData(K &k)
 	  {
 	      bool b = false;
-		
-	      while(true)
-	      {
-		skipnode<K,T> *n = head.load();
-		boost::shared_lock<boost::upgrade_mutex> lk(n->node_lock);
-		if(!n->nlink.load()->isTailNode()) 
-		{
-		   lk.unlock();
-		   lk.release();
-		}
-		else 
-		{
-		   b = Find(lk,n,k);
-		   break;
-		}
-	      }
+	
+	      skipnode<K,T> *n = head.load();
+	      n->node_lock.lock();
+	      if(ValidHead())
+		b = Find(n,k);
+	      else n->node_lock.unlock();	      
+
 	      return b;
 	  }
 	  void check_list()
