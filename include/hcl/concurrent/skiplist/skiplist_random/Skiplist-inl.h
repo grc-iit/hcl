@@ -11,6 +11,7 @@
 #include <vector>
 #include <random>
 
+#include<boost/lockfree/queue.hpp>
 #include<boost/thread/mutex.hpp>
 #include<boost/thread/lock_types.hpp>
 #include<boost/thread/shared_mutex.hpp>
@@ -247,14 +248,22 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
   explicit NodeRecycler(const NodeAlloc& alloc)
       : refs_(0), dirty_(false), alloc_(alloc) 
   {
-    //lock_.init();
+    chunk_size = 100;
+    node_queues.resize(64);
+    for(int i=0;i<node_queues.size();i++)
+        node_queues[i] = new boost::lockfree::queue<NodeType*> (128);
   }
 
   explicit NodeRecycler() : refs_(0), dirty_(false) 
-  { //lock_.init(); 
+  {
+    chunk_size = 100; 
+    node_queues.resize(64);
+    for(int i=0;i<node_queues.size();i++)
+      node_queues[i] = new boost::lockfree::queue<NodeType*> (128); 
   }
 
-  ~NodeRecycler() {
+  ~NodeRecycler() 
+  {
     assert(refs()==0);
     if (nodes_) 
     {
@@ -263,6 +272,41 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
         NodeType::destroy(alloc_, node);
       }
     }
+    for(int i=0;i<node_queues.size();i++)
+	    delete node_queues[i];
+  }
+
+  void push(int h,NodeType *node)
+  {
+      assert (h >= 0 && h < 64);
+      node_queues[h]->push(node);
+      bool b = false;
+      bool p = false;
+      bool n = true;
+      assert(refs() > 0);
+      b = dirty_.compare_exchange_strong(p,n,std::memory_order_relaxed);
+  }
+  NodeType *pop(int h,bool ishead)
+  {
+     NodeType *n = nullptr;
+     assert (h >= 0 && h < 64);
+     while(!node_queues[h]->pop(n))
+     {     
+	for(int i=0;i<chunk_size;i++)
+	{	  
+      	     NodeType *nn = NodeType::create(alloc_,h,NodeType::value_type()); 
+	     node_queues[h]->push(nn);
+	}
+	if(node_queues[h]->pop(n)) break;
+     }
+
+     assert (refs() > 0);
+     bool b = false;
+     bool p = false; 
+     bool p_n = true;
+     b = dirty_.compare_exchange_strong(p,p_n,std::memory_order_relaxed);
+     n->setFlags(0);
+     return n;
   }
 
   void add(NodeType* node) 
@@ -314,28 +358,13 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
  private:
   int refs() const { return refs_.load(std::memory_order_relaxed); }
 
+  std::vector<boost::lockfree::queue<NodeType*> *> node_queues; 
   std::unique_ptr<std::vector<NodeType*>> nodes_;
   std::atomic<int32_t> refs_; 
   std::atomic<bool> dirty_; 
   boost::mutex lock_; 
   NodeAlloc alloc_;
+  int chunk_size;
 };
 
-/*
-template <typename NodeType, typename NodeAlloc>
-class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<NodeType::template DestroyIsNoOp<NodeAlloc>::value>::type> 
-{
- public:
-  explicit NodeRecycler(const NodeAlloc& alloc) : alloc_(alloc) {}
-
-  void addRef() {}
-  void releaseRef() {}
-
-  void add(NodeType*) {}
-
-  NodeAlloc& alloc() { return alloc_; }
-
- private:
-  NodeAlloc alloc_;
-};*/
 
