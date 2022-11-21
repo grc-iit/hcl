@@ -16,9 +16,6 @@
 #include<boost/thread/shared_mutex.hpp>
 #include <boost/random.hpp>
 
-//#include <folly/Memory.h>
-//#include <folly/ThreadLocal.h>
-
 
 template <typename ValT, typename NodeT>
 class csl_iterator;

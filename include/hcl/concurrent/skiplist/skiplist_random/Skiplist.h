@@ -11,9 +11,6 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include "Skiplist-inl.h"
-//#include <folly/Memory.h>
-//#include <folly/detail/Iterators.h>
-//#include <folly/synchronization/MicroSpinLock.h>
 
 template <typename T,typename Comp = std::less<T>,typename NodeAlloc = std::allocator<char>,int MAX_HEIGHT = 24>
 class ConcurrentSkipList 
