@@ -31,8 +31,17 @@ void list_operations(struct thread_arg *t)
     {
 	int key = random()%10000000;
 
-	s.insert(key);
-        assert (s.contains(key)==true);
+	int op = random()%3;
+	if(op==0)
+	{
+	  s.insert(key);
+	}
+	else if(op==1)
+	{
+	   s.contains(key);
+	}
+	else
+	s.remove(key);
     }
 
 }
@@ -43,9 +52,11 @@ int main(int argc, char* argv[])
    std::vector<struct thread_arg> t_args(num_threads);
    std::vector<std::thread> workers(num_threads);
 
-   int num_operations = 100;
+   int num_operations = 1000000;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
+
+   auto t1 = std::chrono::high_resolution_clock::now();
 
    for(int i=0;i<num_threads;i++)
    {
@@ -60,4 +71,7 @@ int main(int argc, char* argv[])
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
+   auto t2 = std::chrono::high_resolution_clock::now();
+   double t = std::chrono::duration<double>(t2-t1).count();
+   std::cout <<" num_operations = "<<num_operations<<" num_threads = "<<num_threads<<" time taken = "<<t<<" seconds"<<std::endl;
 }
