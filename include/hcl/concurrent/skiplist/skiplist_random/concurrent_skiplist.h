@@ -97,7 +97,7 @@ class concurrent_skiplist : public container
 
 	bool isLocal(T &k)
 	{
-	   if(serverLocation(k)==serverid) return true;
+	   if(is_server && serverLocation(k)==serverid) return true;
 	   else return false;
 	}
 
