@@ -81,7 +81,7 @@ class unordered_map_concurrent : public container
    {
        uint64_t hashval = HashFcn()(k);
        uint64_t pos = hashval % totalSize;
-       if(pos >= min_range && pos < max_range) return true;
+       if(is_server && pos >= min_range && pos < max_range) return true;
        else return false;
    }
 
