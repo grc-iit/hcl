@@ -127,6 +127,10 @@ class SkipListNode
   {
       new (&data_) value_type(std::forward<value_type>(data));
   }
+  void storeData(const value_type& data)
+  {
+     new (&data_) value_type(data);
+  }
  private:
   template <typename U>
   SkipListNode(uint8_t height, U&& data, bool isHead)

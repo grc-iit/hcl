@@ -21,17 +21,8 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
-#include <map>
 #include <utility>
 #include <random>
-#include <cassert>
-
-#if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
-template <typename A>
-void serialize(A &ar, int &a) {
-  ar &a;
-}
-#endif
 
 int main(int argc, char *argv[]) {
   int provided;
@@ -43,7 +34,7 @@ int main(int argc, char *argv[]) {
   int comm_size, my_rank;
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  int ranks_per_server = 2, num_request = 100;
+  int ranks_per_server = comm_size, num_request = 10000;
   long size_of_request = 1000;
   bool debug = false;
   bool server_on_node = false;
@@ -53,6 +44,10 @@ int main(int argc, char *argv[]) {
   if (argc > 4) server_on_node = (bool)atoi(argv[4]);
   if (argc > 5) debug = (bool)atoi(argv[5]);
 
+  /* if(comm_size/ranks_per_server < 2){
+       perror("comm_size/ranks_per_server should be atleast 2 for this test\n");
+       exit(-1);
+   }*/
   int len;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   MPI_Get_processor_name(processor_name, &len);
@@ -65,29 +60,32 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
     getchar();
   }
+  MPI_Barrier(MPI_COMM_WORLD);
   bool is_server = (my_rank + 1) % ranks_per_server == 0;
   int my_server = my_rank / ranks_per_server;
   int num_servers = comm_size / ranks_per_server;
 
-  assert (comm_size%ranks_per_server==0);
-
+  // The following is used to switch to 40g network on Ares.
+  // This is necessary when we use RoCE on Ares.
   std::string proc_name = std::string(processor_name);
+  /*int split_loc = proc_name.find('.');
+  std::string node_name = proc_name.substr(0, split_loc);
+  std::string extra_info = proc_name.substr(split_loc+1, string::npos);
+  proc_name = node_name + "-40g." + extra_info;*/
 
   size_t size_of_elem = sizeof(int);
 
-  if(is_server)
   printf("rank %d, is_server %d, my_server %d, num_servers %d\n", my_rank,
          is_server, my_server, num_servers);
 
   const int array_size = TEST_REQUEST_SIZE;
 
-  if (size_of_request != array_size) 
-  {
-    if(my_rank==0)
-	 std::cout <<" Please set request size and number of RPC threads in constants.h. Default value for request size is "<<TEST_REQUEST_SIZE<<" and number of RPC_THREADS is 1"<<std::endl;
+  if (size_of_request != array_size && my_rank==0) {
+    printf(
+        "Please set TEST_REQUEST_SIZE in include/hcl/common/constants.h "
+        "instead. Testing with %d\n",
+        array_size);
   }
-
-  std::array<int, array_size> my_vals = std::array<int, array_size>();
 
   HCL_CONF->IS_SERVER = is_server;
   HCL_CONF->MY_SERVER = my_server;
@@ -95,70 +93,55 @@ int main(int argc, char *argv[]) {
   HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
   HCL_CONF->SERVER_LIST_PATH = "./server_list";
 
+  hcl::concurrent_skiplist<int> *set = new hcl::concurrent_skiplist<int> ();
+
+  set->initialize_sets(num_servers,my_server);
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Comm client_comm;
+  MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);
+  int client_comm_size;
+  int client_rank;
+  MPI_Comm_size(client_comm, &client_comm_size);
+  MPI_Comm_rank(client_comm,&client_rank);
+
   std::default_random_engine rd;
   std::uniform_int_distribution<int> dist(0,100000000);
 
   rd.seed(my_rank);
   auto die = std::bind(dist,rd);
 
-  hcl::concurrent_skiplist<int> *set = new hcl::concurrent_skiplist<int>();
-
-  set->initialize_sets(num_servers,my_server); 
-
   MPI_Barrier(MPI_COMM_WORLD);
-   
-  num_request = 10000;
 
-  MPI_Comm client_comm;
-  MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);
-  int client_comm_size;
-  int client_rank;
-  MPI_Comm_size(client_comm, &client_comm_size);
-  MPI_Comm_rank(client_comm, &client_rank);
-
-  int num_ops = num_request / client_comm_size;
-  int rem = num_request % client_comm_size;
-  if(client_rank < rem) num_ops++;
-
-  MPI_Barrier(MPI_COMM_WORLD);
   if (!is_server) 
   {
-
-    MPI_Barrier(client_comm);
-    auto t1 = std::chrono::high_resolution_clock::now(); 
-
-    for(int i=0;i<num_ops;i++)
-    {
-	int op = dist(rd)%3;
+      auto t1 = std::chrono::high_resolution_clock::now();
+      for (int i = 0; i < num_request; i++) 
+      {
+	int op = random()%3;
+        int value = dist(rd)%10000;
+        uint64_t s = set->serverLocation(value);
 	if(op==0)
 	{
-	    int k = dist(rd);
-	    uint64_t r = set->serverLocation(k);
-	    bool s = set->Insert(r,k);
+           set->Insert(s,value);
 	}
 	else if(op==1)
 	{
-	   int k = dist(rd);
-	   uint64_t r = set->serverLocation(k);
-	   bool s = set->Find(r,k);
+	   set->Find(s,value);
 	}
-	else if(op==2)
-	{
-	  int k = dist(rd);
-	  uint64_t r = set->serverLocation(k);
-	  bool s = set->Erase(r,k);
-	}
-    }
+	else
+	   set->Erase(s,value);
+      }
+  
+      auto t2 = std::chrono::high_resolution_clock::now();
+      double t = std::chrono::duration<double>(t2-t1).count();
 
-    auto t2 = std::chrono::high_resolution_clock::now();
-    double t = std::chrono::duration<double>(t2-t1).count();
-    MPI_Barrier(client_comm);
-
-    double total_time = 0;
-    MPI_Allreduce(&t,&total_time,1,MPI_DOUBLE,MPI_MAX,client_comm);
-    if(client_rank==0) std::cout <<" Number of request = "<<num_request<<" Total time taken = "<<t<<" seconds"<<std::endl;
-
+      MPI_Barrier(client_comm);
+      double max_time = 0;
+      MPI_Allreduce(&t,&max_time,1,MPI_DOUBLE,MPI_MAX,client_comm);
+      if(client_rank==0) std::cout <<" number of operations = "<<num_request*client_comm_size<<" time taken = "<<max_time<<std::endl;
   }
+
   MPI_Barrier(MPI_COMM_WORLD);
   delete (set);
   MPI_Finalize();

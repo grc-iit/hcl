@@ -465,7 +465,10 @@ class ConcurrentSkipList<T, Comp, NodeAlloc, MAX_HEIGHT>::Accessor
     return *this;
   }
 
-  ~Accessor() { sl_->recycler_.releaseRef(); }
+  ~Accessor() 
+  {
+    sl_->recycler_.releaseRef(); 
+  }
 
   bool empty() const { return sl_->size() == 0; }
   size_t size() const { return sl_->size(); }

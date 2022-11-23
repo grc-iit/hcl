@@ -117,8 +117,8 @@ class concurrent_skiplist : public container
 	}
 	~concurrent_skiplist()
 	{
-	   if(s != nullptr) delete s;
 	   if(a != nullptr) delete a;
+	   if(s != nullptr) delete s;
 	   this->container::~container();
 	}
 	
@@ -213,7 +213,7 @@ class concurrent_skiplist : public container
     THALLIUM_DEFINE(LocalFind, (k), T& k)
     THALLIUM_DEFINE(LocalErase, (k), T& k)
 #endif
-
+   
    bool Insert(uint64_t &s, T& k);
    bool Find(uint64_t &s,T& k);
    bool Erase(uint64_t &s, T& k);
