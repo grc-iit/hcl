@@ -195,7 +195,8 @@ class concurrent_skiplist : public container
 
      bool LocalInsert(T &k)
      {
-	  return a->add(k);
+	  auto ret = a->insert(k);
+	  return ret.second;
      }
      bool LocalFind(T &k)
      {
