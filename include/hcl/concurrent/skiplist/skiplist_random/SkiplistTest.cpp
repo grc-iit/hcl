@@ -30,17 +30,16 @@ void list_operations(struct thread_arg *t)
     for(int i=0;i<t->num_operations;i++)
     {
 	int key = random()%10000000;
-
 	int op = random()%3;
-	if(op==0)
+	//if(op==0)
 	{
 	  s.insert(key);
 	}
-	else if(op==1)
+	//else if(op==1)
 	{
 	   s.contains(key);
 	}
-	else
+//	else
 	s.remove(key);
     }
 

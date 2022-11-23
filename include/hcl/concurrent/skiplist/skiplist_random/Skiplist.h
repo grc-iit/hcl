@@ -32,13 +32,13 @@ class ConcurrentSkipList
 
   explicit ConcurrentSkipList(int height, const NodeAlloc& alloc)
       : recycler_(alloc),
-        head_(NodeType::create(recycler_.alloc(), height, value_type(), true)) 
+        head_(recycler_.pop(height,true))//NodeType::create(recycler_.alloc(), height, value_type(), true)) 
   {
   }
 
   explicit ConcurrentSkipList(int height)
       : recycler_(),
-        head_(NodeType::create(recycler_.alloc(), height, value_type(), true)) 
+        head_(recycler_.pop(height,true))//NodeType::create(recycler_.alloc(), height, value_type(), true)) 
   {
   }
 
@@ -195,7 +195,8 @@ class ConcurrentSkipList
         continue; 
       }
 
-      newNode = NodeType::create(recycler_.alloc(), nodeHeight, std::forward<U>(data));
+      newNode = recycler_.pop(nodeHeight,false);//NodeType::create(recycler_.alloc(), nodeHeight, std::forward<U>(data));
+      newNode->storeData(std::forward<U>(data));
       for (int k = 0; k < nodeHeight; ++k) 
       {
         newNode->setSkip(k, succs[k]);
@@ -269,7 +270,8 @@ class ConcurrentSkipList
 	      if(guards[i]) preds[i]->releaseGuard();
       break;
     }
-    recycle(nodeToDelete);
+    recycler_.push(nodeToDelete->height(),nodeToDelete);
+    //recycle(nodeToDelete);
     return true;
   }
 
@@ -379,8 +381,8 @@ class ConcurrentSkipList
       return;
     }
 
-    NodeType* newHead =
-        NodeType::create(recycler_.alloc(), height, value_type(), true);
+    NodeType* newHead = recycler_.pop(height,true);
+        //NodeType::create(recycler_.alloc(), height, value_type(), true);
 
     { 
       bool g = oldHead->acquireGuard();
@@ -396,7 +398,8 @@ class ConcurrentSkipList
       oldHead->setMarkedForRemoval();
       oldHead->releaseGuard();
     }
-    recycle(oldHead);
+    recycler_.push(oldHead->height(),oldHead);
+    //recycle(oldHead);
   }
 
   void recycle(NodeType* node) { recycler_.add(node); }
@@ -474,7 +477,8 @@ class ConcurrentSkipList<T, Comp, NodeAlloc, MAX_HEIGHT>::Accessor
   }
   size_type count(const key_type& data) const { return contains(data); }
 
-  iterator begin() const {
+  iterator begin() const 
+  {
     NodeType* head = sl_->head_.load(std::memory_order_acquire);
     return iterator(head->next());
   }

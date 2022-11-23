@@ -56,10 +56,6 @@ class SkipListNode
     std::allocator_traits<NodeAlloc>::deallocate(alloc, typename std::allocator_traits<NodeAlloc>::pointer(node), size);
   }
 
-  /*template <typename NodeAlloc>
-  struct DestroyIsNoOp : StrictConjunction<
-                             AllocatorHasTrivialDeallocate<NodeAlloc>,
-                             std::is_trivially_destructible<SkipListNode>> {};*/
 
   SkipListNode* copyHead(SkipListNode* node) 
   {
@@ -111,6 +107,11 @@ class SkipListNode
      return true;
   }
 
+  uint16_t getFlags() const { return flags_.load(std::memory_order_acquire); }
+  void setFlags(uint16_t flags)
+  {
+    flags_.store(flags, std::memory_order_release);
+  }
   bool fullyLinked() const { return getFlags() & FULLY_LINKED; }
   bool markedForRemoval() const { return getFlags() & MARKED_FOR_REMOVAL; }
   bool isHeadNode() const { return getFlags() & IS_HEAD_NODE; }
@@ -121,13 +122,16 @@ class SkipListNode
   {
     setFlags(uint16_t(getFlags() | MARKED_FOR_REMOVAL));
   }
-
+  
+  void storeData(value_type& data)
+  {
+      new (&data_) value_type(std::forward<value_type>(data));
+  }
  private:
   template <typename U>
   SkipListNode(uint8_t height, U&& data, bool isHead)
       : height_(height), data_(std::forward<U>(data)) 
   {
-    //spinLock_.init();
     setFlags(0);
     if (isHead) 
     {
@@ -145,12 +149,6 @@ class SkipListNode
     {
       skip_[i].~atomic();
     }
-  }
-
-  uint16_t getFlags() const { return flags_.load(std::memory_order_acquire); }
-  void setFlags(uint16_t flags) 
-  {
-    flags_.store(flags, std::memory_order_release);
   }
 
   std::atomic<uint16_t> flags_;
@@ -290,22 +288,24 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
   {
      NodeType *n = nullptr;
      assert (h >= 0 && h < 64);
+     typedef typename NodeType::value_type v;
      while(!node_queues[h]->pop(n))
      {     
 	for(int i=0;i<chunk_size;i++)
 	{	  
-      	     NodeType *nn = NodeType::create(alloc_,h,NodeType::value_type()); 
+      	     NodeType *nn = NodeType::create(alloc_,h,v()); 
 	     node_queues[h]->push(nn);
 	}
 	if(node_queues[h]->pop(n)) break;
      }
 
-     assert (refs() > 0);
+     assert (refs() >= 0);
      bool b = false;
      bool p = false; 
      bool p_n = true;
      b = dirty_.compare_exchange_strong(p,p_n,std::memory_order_relaxed);
      n->setFlags(0);
+     if(ishead) n->setIsHeadNode();
      return n;
   }
 
@@ -339,6 +339,15 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
       ret = refs_.fetch_add(-1, std::memory_order_acq_rel);
       if (ret == 1) 
       {
+	for(int i=0;i<64;i++)
+	{
+	   while(!node_queues[i]->empty())
+	   {
+		NodeType *n;
+		if(node_queues[i]->pop(n))
+		  NodeType::destroy(alloc_,n);
+	   }
+	}
         newNodes.swap(nodes_);
         dirty_.store(false, std::memory_order_relaxed);
       }
