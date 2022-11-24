@@ -9,8 +9,12 @@
 #include <type_traits>
 #include <vector>
 #include <cassert>
+#include <boost/atomic.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/config.hpp>
+
 
 enum : uint32_t
 {
@@ -28,6 +32,7 @@ class skipnode
    boost::upgrade_mutex node_lock;
    K key_;
    T data_;
+   boost::atomic<boost::int128_type> key_nlink;
    std::atomic<uint32_t> flags_;
    std::atomic<skipnode<K,T>*> nlink;
    //std::atomic<struct skipnode<T>*> plink;
@@ -38,6 +43,7 @@ class skipnode
 	new (&key_) K();
 	new (&data_) T();
 	new (&node_lock) boost::upgrade_mutex();
+	key_nlink.store(0);
 	nlink.store(0);
 	bottom.store(nullptr);
 	flags_.store(0);
@@ -78,6 +84,36 @@ class skipnode
     void setIsHeadNode() 
     { 
        setFlags(flags_.load() | IS_HEAD_NODE); 
+    }
+    bool isMarked()
+    {
+	return flags_.load() & MARKED_FOR_REMOVAL;
+    }
+    void setMarkNode()
+    {
+	setFlags(flags_.load() | MARKED_FOR_REMOVAL);
+    }
+    void unsetMarkNode()
+    {
+	uint32_t mask = UINT32_MAX;
+	mask = mask << 2;
+	mask = mask | (uint32_t)1;
+	setFlags(flags_.load() & mask); 
+    }
+    void setFullyLinked()
+    {
+       setFlags(flags_.load() | FULLY_LINKED);
+    }
+    bool isFullyLinked()
+    {
+       return flags_.load() & FULLY_LINKED;
+    }
+    void unsetFullyLinked()
+    {
+	uint32_t mask = UINT32_MAX;
+	mask = mask << 3;
+	mask = mask | (uint32_t)3;
+	setFlags(flags_.load() & mask);
     }
     bool isTailNode()
     {

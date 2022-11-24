@@ -30,10 +30,12 @@ void operations(struct thread_arg *t)
 	   //if(op==0)
 	   {
              b = false;
-	     do
-	     {
+	     /*do
+	     {*/
 	      b = s->InsertData(key,data);
-	      }while(!b);
+
+	      b = s->FindData(key);
+	      /*}while(!b);*/
 
 	   }
 	   /*else if(op==1)
@@ -49,16 +51,23 @@ void operations(struct thread_arg *t)
 
 	   }*/
 	}
-	else
+	/*else
 	{
 	   for(int i=0;i<t->num_operations;i++)
 	   {
 	      int key = random()%10000000;
 	      bool b = false;
 
+	      int d=0;
+	      do
+	      {
+		  d = s->FindData(key);
+	      }while(d==0);
+
+	      //std::cout <<" key = "<<key<<std::endl;
 	      b = s->EraseData(key);
 	   }
-	}
+	}*/
 }
 
 int main(int argc, char **argv)
@@ -68,7 +77,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 10000000;
+   int num_operations = 1000000;
    int num_threads = 12;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
@@ -76,7 +85,7 @@ int main(int argc, char **argv)
    std::vector<struct thread_arg> t_args(12);
    std::vector<std::thread> workers(12);
 
-   //auto t1 = std::chrono::high_resolution_clock::now();
+   auto t1 = std::chrono::high_resolution_clock::now();
 
    for(int i=0;i<num_threads;i++)
    {
@@ -91,13 +100,13 @@ int main(int argc, char **argv)
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
-   num_threads = 1;
+   /*num_threads = 12;
 
    nops = num_operations/num_threads;
    rem = num_operations%num_threads;
 
    //s->check_list();
-   auto t1 = std::chrono::high_resolution_clock::now();
+   //auto t1 = std::chrono::high_resolution_clock::now();
 
    for(int i=0;i<num_threads;i++)
    {
@@ -110,7 +119,7 @@ int main(int argc, char **argv)
    }
 
    for(int i=0;i<num_threads;i++)
-	   workers[i].join();
+	   workers[i].join();*/
    
    auto t2 = std::chrono::high_resolution_clock::now();
    double t = std::chrono::duration<double> (t2-t1).count();
