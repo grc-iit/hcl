@@ -439,7 +439,7 @@ class Skiplist
 	     k_n = n2->key_nlink.load();
 	     skipnode<K,T>* n2_n = (skipnode<K,T>*)k_n;
 	     key2 = (K)(k_n >> 64);
-
+	     bool n2_d = false;
 	     if(first_node)
 	     {
 		    assert (n1_nodes.size() > 0 && n2_nodes.size() > 0);
@@ -452,6 +452,7 @@ class Skiplist
 			   kn = kn << 64;kn = kn | (boost::int64_t)n2_n;
 			   n2->setFlags(0); n2->setMarkNode();
 			   n1->key_nlink.store(kn);
+			   n2_d = true;
                         }
                         else
                         {
@@ -471,6 +472,7 @@ class Skiplist
 				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
 				n2->setFlags(0); n2->setMarkNode();
                                 n1->key_nlink.store(kn);
+				n2_d = true;
                              }
                           }
                           else 
@@ -489,6 +491,7 @@ class Skiplist
 				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
 				n2->setFlags(0); n2->setMarkNode();
 				n1->key_nlink.store(kn);
+				n2_d = true;
 			      }
                           }
 
@@ -501,6 +504,7 @@ class Skiplist
 
 		assert (n1_nodes.size() > 0 && n2_nodes.size() > 0);
 
+		 bool n2_d = false;
 		 if(n2_nodes.size() < 3)
                  {
                      if(n1_nodes.size() < 3)
@@ -509,6 +513,7 @@ class Skiplist
 			    kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
 			    n2->setFlags(0); n2->setMarkNode();
 			    n1->key_nlink.store(kn);
+			    n2_d = true;
                      }
                      else
                      {
@@ -528,6 +533,7 @@ class Skiplist
 				   kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
 				   n2->setFlags(0); n2->setMarkNode();
 				   n1->key_nlink.store(kn);
+				   n2_d = true;
                                 }
                            }
                            else
@@ -546,12 +552,12 @@ class Skiplist
 				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
 				n2->setFlags(0); n2->setMarkNode();
 				n1->key_nlink.store(kn);
+				n2_d = true;
 			     }
                            }
                         }
 
                     }
-
 	     }
 
 	     return found;
@@ -659,12 +665,15 @@ class Skiplist
 		   key1 = (K)(kn >> 64);
 		   K key_n;
 
+		   //std::cout <<" n1 = "<<n1<<" n2 = "<<n2<<std::endl;
+
 		   for(;;)
 		   {
 			while(!p_n->isFullyLinked() && !p_n->isMarked());
 			p_n->node_lock.lock();
 			k_n = p_n->key_nlink.load();
 			key_n = (K)(k_n >> 64);
+			//if(key1 == 1979802) std::cout <<" n1 = "<<n1<<" key1 = "<<key1<<" key_n = "<<key_n<<" head = "<<head.load()<<std::endl;
 			n1_nodes.push_back(p_n);
 			if(key_n == key1 || p_n->isBottomNode()) break;
 			p_n = (skipnode<K,T>*)k_n;
@@ -721,7 +730,7 @@ class Skiplist
 			   if(key_nn == key1) n1_pos = i;
 			}
 		        
-			if(pos==0 || pos-n1_pos==0)
+			if(pos==0 || pos-n1_pos==1)
 			{
 			    n1_next = nodes_n[pos]; n2_next = nodes_n[pos+1];
 			}
@@ -755,7 +764,9 @@ class Skiplist
 		bool valid = false;
 		bool b = false;
 
+		//std::cout <<" Erase k = "<<k<<std::endl;
 		b = Erase(n,n,k);
+		//std::cout <<" Erase k end = "<<k<<std::endl;
 		
 
 		if(!b)
