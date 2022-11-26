@@ -148,7 +148,7 @@ class Skiplist
 		      pl->memory_pool_push(t); pl->memory_pool_push(t_b);
 		   }
              }
-	     else 
+	     else if(!n->isMarked()) 
 	     {
 		 std::vector<skipnode<K,T>*> nodes;
 		 skipnode<K,T> *p_n = nullptr;
@@ -220,7 +220,7 @@ class Skiplist
 		  kn = n->key_nlink.load();
 		  key = (K)(kn >> 64);
 		  p_n = (skipnode<K,T>*)kn;
-		  invalid = (n==head.load() && !p_n->isTailNode());
+		  invalid = (n==head.load() && !p_n->isTailNode()) || n->isMarked();
 		  if(invalid)
 		  {
 		     n->node_lock.unlock(); return false;
@@ -313,15 +313,17 @@ class Skiplist
 	      skipnode<K,T> *b = n->bottom.load();
 	      b->node_lock.lock();
 	      bool dec = false;
-	      if(n->key_ == b->key_ && !b->isBottomNode())
+	      boost::int128_type kn = n->key_nlink.load();
+	      K key1 = (K)(kn >> 64);
+	      kn = b->key_nlink.load();
+	      K key2 = (K)(kn >> 64);
+	      if(key1 == key2 && !b->isBottomNode())
 	      {
 		//std::cout <<" decreasedepth"<<std::endl;
 		skipnode<K,T> *bb = b->bottom.load();
-		bb->node_lock.lock_shared();
 		n->bottom.store(bb);
-		b->setFlags(0);
+		b->setFlags(0); b->setMarkNode();
 		dec = true;
-		bb->node_lock.unlock_shared();
 	      }
 	      b->node_lock.unlock();
 	      n->node_lock.unlock();
@@ -337,30 +339,22 @@ class Skiplist
 		return n->bottom.load()->isBottomNode();
 	  }
 
-	  bool drop_key(skipnode<K,T> *n,K &k)
+	  bool drop_key(skipnode<K,T> *n,K &k,std::vector<skipnode<K,T>*> &nodes)
 	  {
 	     bool found = false;
-	     std::vector<skipnode<K,T> *> nodes;
+	     boost::int128_type kn,k_n;
 	     skipnode<K,T> *p_n = nullptr;
-	     std::vector<skipnode<K,T>*> deleted_nodes;
-
-     	     p_n = n->bottom.load();	     
-	     for(;;)
-	     {
-		nodes.push_back(p_n);
-		if(p_n->key_ == n->key_ || p_n->isBottomNode()) break;
-		p_n = p_n->nlink.load();
-	     }
 
 	     int pos = -1;
 	     for(int i=0;i<nodes.size();i++)
 	     {
-		     if(nodes[i]->key_ == k)
-		     {
+		    kn = nodes[i]->key_nlink.load();
+		    K key_n = (K)(kn >> 64);
+		    if(key_n == k)
+		    {
 			 pos = i; break;
-		     }
+		    }
 	     }
-	     //std::cout <<" drop_key pos = "<<pos<<std::endl;
 
 	     if(pos==-1 || nodes.size() < 2)
 	     {
@@ -371,184 +365,188 @@ class Skiplist
 	     p_n = n->bottom.load();
 	     skipnode<K,T> *n1 = nodes[pos];
 	     skipnode<K,T> *n2 = nodes[pos+1];
-	
+	     n1->unsetMarkNode();
+	     K key1, key2;
+	     kn = n1->key_nlink.load();
+	     key1 = (K)(kn >> 64);
+	     skipnode<K,T> *n1_n = (skipnode<K,T>*)kn;
+	     kn = n2->key_nlink.load();
+	     key2 = (K)(kn >> 64); 
+	     skipnode<K,T> *n2_n = (skipnode<K,T>*)kn;
+
 	     std::vector<skipnode<K,T>*> n1_nodes,n2_nodes;
 
-	     n1->unsetMarkNode();
 	     p_n = n1->bottom.load();
 	     for(;;)
 	     {
-		p_n->node_lock.lock_shared();
+		while(!p_n->isFullyLinked() && !p_n->isMarked());
+		p_n->node_lock.lock();
+		kn = p_n->key_nlink.load();
+		K key_n = (K)(kn >> 64);
+		if(key_n==k && !p_n->isMarked()) p_n->setMarkNode();
 		n1_nodes.push_back(p_n);
-		if(p_n->key_ == k) p_n->setMarkNode();
-		if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
-		p_n = p_n->nlink.load();
+		if(key_n == key1 || p_n->isBottomNode()) break;
+		p_n = (skipnode<K,T>*)kn;
 	     }
 	    
 	     p_n = n2->bottom.load();
 
 	     for(;;)
 	     {
-		p_n->node_lock.lock_shared();
+		while(!p_n->isFullyLinked() && !p_n->isMarked());
+		p_n->node_lock.lock();
+		kn = p_n->key_nlink.load();
+		K key_n = (K)(kn >> 64);
 	        n2_nodes.push_back(p_n);
-		if(p_n->key_ == n2->key_||p_n->isBottomNode()) break;
-		p_n = p_n->nlink.load();
+		if(key_n == key2 ||p_n->isBottomNode()) break;
+		p_n = (skipnode<K,T>*)kn;
 	     }	
 	
 	     int numnodes = n1_nodes.size();
-	     if(numnodes > 2)
+	     if(numnodes > 2 && !n1_nodes[numnodes-2]->isMarked())
              {
-                 skipnode<K,T> *t = n1->bottom.load();
-                 p_n = t;
-
-		 for(;;)
-                 {
-                   if(t->key_ == n1->key_||t->isBottomNode()) break;
-                   p_n = t;
-                   t = t->nlink.load();
-                 }
-	
-                 n1->key_ = p_n->key_;
-                 n2->bottom.store(t);
+		kn = n1_nodes[numnodes-2]->key_nlink.load();
+		kn = kn >> 64; kn = kn << 64;
+		kn = kn | (boost::int64_t)n1_n;
+		n1->key_nlink.store(kn);
+		n2->bottom.store(n1_nodes[numnodes-1]);
              }
              else
              {
-                 n1->key_ = n2->key_;
-                 n1->nlink.store(n2->nlink.load());
-		 n2->setFlags(0);
-		 //deleted_nodes.push_back(n2);
-		 //if(n2->bottom.load()->isBottomNode()) deleted_nodes.push_back(n2->bottom.load());
-                 //deleted_nodes.push_back(n2);
+		 kn = key2; kn = kn << 64;
+		 kn = kn | (boost::int64_t)n2_n;
+		 n2->setFlags(0); n2->setMarkNode();
+		 n1->key_nlink.store(kn);
               }
 		
-	      for(int i=0;i<n1_nodes.size();i++) n1_nodes[i]->node_lock.unlock_shared();
-	      for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock_shared();
+	      for(int i=0;i<n1_nodes.size();i++) n1_nodes[i]->node_lock.unlock();
+	      for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock();
 	
 	      return true;
 	  }
 
-	  bool merge_nodes(skipnode<K,T> *n1, skipnode<K,T> *n2,bool first_node)
+	  bool merge_nodes(skipnode<K,T> *n1, skipnode<K,T> *n2,bool first_node,std::vector<skipnode<K,T>*> &n1_nodes, std::vector<skipnode<K,T>*> &n2_nodes)
 	  {
 
 	     bool found = false;
-	     std::vector<skipnode<K,T> *> n1_nodes, n2_nodes;
 	     skipnode<K,T> *p_n = nullptr;
-	     std::vector<skipnode<K,T>*> deleted_nodes;
+	     boost::int128_type kn, k_n;
+	     K key1, key2;
+		
+	     kn = n1->key_nlink.load();
+	     key1 = (K)(kn >> 64);
+	     skipnode<K,T> *n1_n = (skipnode<K,T>*)kn;
+	     k_n = n2->key_nlink.load();
+	     skipnode<K,T>* n2_n = (skipnode<K,T>*)k_n;
+	     key2 = (K)(k_n >> 64);
 
-	     if(first_node && !n2->isTailNode())
+	     if(first_node)
 	     {
-		    p_n = n1->bottom.load();
-		    for(;;)
-                    {
-			  p_n->node_lock.lock_shared();
-                          n1_nodes.push_back(p_n);
-			  if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
-			  p_n = p_n->nlink.load();
-                    }
-
-		    p_n = n2->bottom.load();
-
-		    for(;;)
-                    {
-			p_n->node_lock.lock_shared();
-                        n2_nodes.push_back(p_n);
-			if(p_n->key_ == n2->key_ || p_n->isBottomNode()) break;
-			p_n = p_n->nlink.load();
-                    }
-
 		    assert (n1_nodes.size() > 0 && n2_nodes.size() > 0);
 
 		     if(n1_nodes.size() < 3)
                     {
                         if(n2_nodes.size()<3)
                         {
-                           n1->key_ = n2->key_;
-			   n2->setFlags(0);
-                           //deleted_nodes.push_back(n2);
-                           n1->nlink.store(n2->nlink.load());
+                           kn = (boost::int128_type)key2;
+			   kn = kn << 64;kn = kn | (boost::int64_t)n2_n;
+			   n2->setFlags(0); n2->setMarkNode();
+			   n1->key_nlink.store(kn);
                         }
                         else
                         {
                           if(n1_nodes.size()==1)
                           {
-                             if(n2_nodes.size() >= 4)
+                             if(n2_nodes.size() >= 4 && !n2_nodes[1]->isMarked())
                              {
-                                n1->key_ = n2_nodes[1]->key_;
+				kn = n2_nodes[1]->key_nlink.load();
+				kn = kn >> 64; kn = kn << 64;
+				kn = kn | (boost::int64_t)n1_n;
+                                n1->key_nlink.store(kn);
                                 n2->bottom.store(n2_nodes[2]);
                              }
                              else
                              {
-                                n1->key_ = n2->key_;
-				n2->setFlags(0);
-                                //deleted_nodes.push_back(n2);
-                                n1->nlink.store(n2->nlink.load());
+				kn = (boost::int128_type)key2;
+				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
+				n2->setFlags(0); n2->setMarkNode();
+                                n1->key_nlink.store(kn);
                              }
                           }
-                          else
+                          else 
                           {
-                              n1->key_ = n2_nodes[0]->key_;
-                              n2->bottom.store(n2_nodes[1]);
+			      if(!n2_nodes[0]->isMarked())
+			      {
+			        kn = n2_nodes[0]->key_nlink.load();
+			        kn = kn >> 64; kn = kn << 64;
+			        kn = kn | (boost::int64_t)n1_n;
+			        n1->key_nlink.store(kn);
+                                n2->bottom.store(n2_nodes[1]);
+			      }
+			      else
+			      {
+				kn = (boost::int128_type)key2;
+				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
+				n2->setFlags(0); n2->setMarkNode();
+				n1->key_nlink.store(kn);
+			      }
                           }
 
 			}
 		    }
 
 	     }
-	     else if(!first_node)
+	     else
 	     {
 
-		p_n = n1->bottom.load();
-
-		for(;;)
-                {
-		   p_n->node_lock.lock_shared();
-		   n1_nodes.push_back(p_n);
-		   if(p_n->key_==n1->key_ || p_n->isBottomNode()) break;
-		   p_n = p_n->nlink.load();
-                }
-	
-		p_n = n2->bottom.load();
-		for(;;)
-		{
-		    p_n->node_lock.lock_shared();
-		    n2_nodes.push_back(p_n);
-		    if(p_n->key_ == n2->key_ || p_n->isBottomNode()) break;
-		    p_n = p_n->nlink.load();
-		}
-
-	
 		assert (n1_nodes.size() > 0 && n2_nodes.size() > 0);
 
 		 if(n2_nodes.size() < 3)
                  {
                      if(n1_nodes.size() < 3)
                      {
-                            n1->key_ = n2->key_;
-			    n2->setFlags(0);
-                            //deleted_nodes.push_back(n2);
-                            n1->nlink.store(n2->nlink.load());
+                            kn = (boost::int128_type)key2;
+			    kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
+			    n2->setFlags(0); n2->setMarkNode();
+			    n1->key_nlink.store(kn);
                      }
                      else
                      {
                            if(n2_nodes.size()==1)
                            {
-                                if(n1_nodes.size()>=4)
+                                if(n1_nodes.size()>=4 && !n1_nodes[n1_nodes.size()-3]->isMarked())
                                 {
+				   kn = n1_nodes[n1_nodes.size()-3]->key_nlink.load();
+				   kn = kn >> 64; kn = kn << 64;
+				   kn = kn | (boost::int64_t)n1_n;
+				   n1->key_nlink.store(kn);
                                    n2->bottom.store(n1_nodes[n1_nodes.size()-2]);
-                                   n1->key_ = n1_nodes[n1_nodes.size()-3]->key_;
                                 }
                                 else
                                 {
-                                   n1->key_ = n2->key_;
-				   n2->setFlags(0);
-                                   //deleted_nodes.push_back(n2);
-                                   n1->nlink.store(n2->nlink.load());
+				   kn = (boost::int128_type)key2;
+				   kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
+				   n2->setFlags(0); n2->setMarkNode();
+				   n1->key_nlink.store(kn);
                                 }
                            }
                            else
                            {
-                             n2->bottom.store(n1_nodes[n1_nodes.size()-1]);
-                             n1->key_ = n1_nodes[n1_nodes.size()-2]->key_;
+			     if(!n1_nodes[n1_nodes.size()-2]->isMarked())
+			     {
+			       kn = n1_nodes[n1_nodes.size()-2]->key_nlink.load();
+			       kn = kn >> 64; kn = kn << 64;
+			       kn = kn | (boost::int64_t)n1_n;
+			       n1->key_nlink.store(kn);
+                               n2->bottom.store(n1_nodes[n1_nodes.size()-1]);
+			     }
+			     else
+			     {
+				kn = (boost::int128_type)key2;
+				kn = kn << 64; kn = kn | (boost::int64_t)n2_n;
+				n2->setFlags(0); n2->setMarkNode();
+				n1->key_nlink.store(kn);
+			     }
                            }
                         }
 
@@ -556,218 +554,214 @@ class Skiplist
 
 	     }
 
-	     for(int i=0;i<n1_nodes.size();i++) n1_nodes[i]->node_lock.unlock_shared();
-	     for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock_shared();
-
 	     return found;
 
 
 	  }
 
-	  bool Erase(skipnode<K,T> *n1, skipnode<K,T> *n2, bool first_node, K &k)
+	  bool Erase(skipnode<K,T> *n1, skipnode<K,T> *n2, K &k)
 	  {
 	     bool found = false;
 
-	     /*bool invalid = false;
+	     bool invalid = false;
 	     bool leaflevel = false;
 	     skipnode<K,T> *nn = nullptr;
 	     skipnode<K,T> *n_t = nullptr;
 	     skipnode<K,T> *p_n = nullptr;
 	     std::vector<skipnode<K,T>*> nodes;
+	     std::vector<K> keys;
+	     boost::int128_type kn,k_n;
+	     std::vector<skipnode<K,T>*> n1_nodes, n2_nodes;
+	     K key1, key2;
+	     skipnode<K,T> *n1_next = nullptr, *n2_next=nullptr;
 
-	     //std::cout <<" k = "<<k<<" n1 = "<<n1<<" n1 = "<<n1->key_<<std::endl;
-	     if(first_node) 
+	     while(!n1->isFullyLinked() && !n1->isMarked());
+	     if(n1 != head.load()) while(!n2->isFullyLinked() && !n2->isMarked());
+	     n1->node_lock.lock();
+	     if(n1 != head.load()) n2->node_lock.lock();
+	     invalid = !n1->isFullyLinked();
+	     if(n1 != head.load() && !invalid) 
 	     {
-		if(n1==head.load() && !n2->isTailNode()) invalid = true;
+		 invalid = !n2->isFullyLinked();
+		 if(!invalid)
+		 {
+		   kn = n1->key_nlink.load();
+		   K key_n = (K)(kn >> 64);
+		   invalid = (key_n != k && n1->isMarked());
+		   k_n = n2->key_nlink.load();
+		   key_n = (K)(k_n >> 64);
+		   invalid = (key_n != k && n2->isMarked());
+		   nn = (skipnode<K,T>*)kn;
+		   if(n2!=nn) invalid = true;
+		 }
 	     }
-
-	     if(n1->nlink.load() != n2) invalid = true;
-	     invalid = !n2->isFullyLinked() || !n1->isFullyLinked();
-	     invalid = n1->isBottomNode() || n2->isTailNode() || n2->isBottomNode() || n2->isTailNode();
-	     if(first_node && k > n1->key_ || !first_node && k > n2->key_) invalid = true;
-	     nn = n1->bottom.load();
-	     if(nn != n1) 
-	     {
-		nn->node_lock.lock_shared();
-	        invalid = nn->isBottomNode();
-		invalid = n1==head.load() && n1->key_ == nn->key_ && !nn->isBottomNode();
-		nn->node_lock.unlock_shared();
-	     }
+	     if(n1->isBottomNode() || n1->isTailNode() || n2->isBottomNode() || n2->isTailNode()) invalid = true;
 
 	     if(!invalid)
 	     {
-		if(first_node)
+		if(n1==head.load())
 		{
-		   if(n1==head.load())
+		   p_n = n1->bottom.load();
+		   kn = n1->key_nlink.load();
+		   key1 = (K)(kn >> 64);
+		   K key_n;
+
+		   for(;;)
 		   {
-			p_n = n1->bottom.load();
-			for(;;)
-			{
-			   p_n->node_lock.lock();
-			   nodes.push_back(p_n);
-			   if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
-			   p_n = p_n->nlink.load();
-			}
-
-			skipnode<K,T> *b = n1->bottom.load();
-			if(b->key_ == n1->key_ && !b->isBottomNode()) invalid = true;
-			if(!invalid)
-			bool d = drop_key(n1,k);
-
-		   }
-		   else
-		   {
-			//std::cout <<" drop n1 = "<<n1->key_<<" k = "<<k<<std::endl;
-			bool d = merge_nodes(n1,n2,first_node);
-
-			p_n = n1->bottom.load();
-			for(;;)
-			{
-		          p_n->node_lock.lock();
-			  nodes.push_back(p_n);
-			  if(p_n->key_==n1->key_ || p_n->isBottomNode()) break;
-			  p_n = p_n->nlink.load();
-			}
-
-			d = drop_key(n1,k);
-			//std::cout <<" merge n1 = "<<n1->key_<<" k = "<<k<<std::endl;
-			//std::cout <<" end n1 = "<<n1->key_<<" k = "<<k<<std::endl;
+		     while(!p_n->isFullyLinked() && !p_n->isMarked());
+		     p_n->node_lock.lock();
+		     k_n = p_n->key_nlink.load();
+		     key_n = (K)(k_n >> 64);
+		     n1_nodes.push_back(p_n);
+		     if(key_n == key1 || p_n->isBottomNode()) break;
+		     p_n = (skipnode<K,T>*)k_n;
 		   }
 
-		}
+		   if(n1_nodes.size() > 1 && !n1_nodes[0]->isBottomNode())
+		   {
+			bool d = drop_key(n1,k,n1_nodes);
+
+			leaflevel = n1_nodes[0]->bottom.load()->isBottomNode();
+			if(!leaflevel)
+			{
+			   int pos = -1;
+			   for(int i=0;i<n1_nodes.size();i++)
+			   {
+				boost::int128_type k_nn = n1_nodes[i]->key_nlink.load();
+				K keynn = (K)(k_nn >> 64);
+				if(k <= keynn)
+				{
+			 	   pos = i; break;
+				}
+			   }
+			   if(pos!=-1) 
+			   {
+				if(pos==0)
+				{
+				   n1_next = n1_nodes[0]; n2_next = n1_nodes[1];
+				}
+				else
+				{
+				    n1_next = n1_nodes[pos-1]; n2_next = n1_nodes[pos];
+				}
+			    }
+
+			}
+		   }
+
+		}	
 		else
 		{
-		    K key1 = n1->key_;
-		    K key2 = n2->key_;
+		   assert (n1 != n2);
 
-		    bool d = merge_nodes(n1,n2,first_node);
+		   p_n = n1->bottom.load();
+		   kn = n1->key_nlink.load();
+		   key1 = (K)(kn >> 64);
+		   K key_n;
 
-		    if(n1->key_ > key1)
-		    {
-			p_n = n1->bottom.load();
+		   for(;;)
+		   {
+			while(!p_n->isFullyLinked() && !p_n->isMarked());
+			p_n->node_lock.lock();
+			k_n = p_n->key_nlink.load();
+			key_n = (K)(k_n >> 64);
+			n1_nodes.push_back(p_n);
+			if(key_n == key1 || p_n->isBottomNode()) break;
+			p_n = (skipnode<K,T>*)k_n;
+		   }
 
-			for(;;)
+		   p_n = n2->bottom.load();
+		   kn = n2->key_nlink.load();
+		   key2 = (K)(kn >> 64);
+
+		   for(;;)
+		   {
+		      while(!p_n->isFullyLinked() && !p_n->isMarked());
+		      p_n->node_lock.lock();
+		      k_n = p_n->key_nlink.load();
+		      key_n = (K)(k_n >> 64);
+		      n2_nodes.push_back(p_n);
+		      if(key_n == key2 || p_n->isBottomNode()) break;
+		      p_n = (skipnode<K,T>*)k_n;
+		   }
+
+		   if(!n1_nodes[0]->isBottomNode())
+		   {
+		     bool first_node = false;
+		     if(k <= key1) first_node = true;
+
+		     bool d = merge_nodes(n1,n2,first_node,n1_nodes,n2_nodes);
+		     kn = n1->key_nlink.load();
+		     key1 = (K)(kn >> 64);
+		     if(!n2->isMarked()) 
+		     {
+		       kn = n2->key_nlink.load();
+		       key2 = (K)(kn >> 64);
+		     }
+		     skipnode<K,T> *n = (k <= key1) ? n1 : n2;
+		     std::vector<skipnode<K,T>*> nodes_n;
+		     nodes_n.assign(n1_nodes.begin(),n1_nodes.end());
+		     for(int i=0;i<n2_nodes.size();i++) nodes_n.push_back(n2_nodes[i]); 
+
+		     d = drop_key(n,k,nodes_n);
+		     if(!n1_nodes[0]->isBottomNode() && n1_nodes[0]->bottom.load()->isBottomNode()) leaflevel = true;
+
+		     if(!leaflevel)
+		     {
+			int pos = -1;
+			int n1_pos = -1;
+			for(int i=0;i<nodes_n.size();i++)
 			{
-			   p_n->node_lock.lock();
-			   nodes.push_back(p_n);
-			   if(p_n->key_ == n1->key_ || p_n->isBottomNode()) break;
-			   p_n = p_n->nlink.load();
+			   boost::int128_type k_nn = nodes_n[i]->key_nlink.load();
+			   K key_nn = (K)(k_nn >> 64);
+			   if(k <= key_nn)
+			   {
+				pos = i; break;
+			   }
+			   if(key_nn == key1) n1_pos = i;
 			}
-			d = drop_key(n1,k);
-
-		    }
-		    else
-		    {
-			p_n = n2->bottom.load();
-			for(;;)
+		        
+			if(pos==0 || pos-n1_pos==0)
 			{
-		           p_n->node_lock.lock();
-			   nodes.push_back(p_n);
-			   if(p_n->key_ == n2->key_ || p_n->isBottomNode()) break;
-			   p_n = p_n->nlink.load();
+			    n1_next = nodes_n[pos]; n2_next = nodes_n[pos+1];
 			}
-			d = drop_key(n2,k);
-
-		    }
+			else 
+			{
+			    n1_next = nodes_n[pos-1]; n2_next = nodes_n[pos];
+			}
+		        	
+		     }
+		   }
 
 		}
 
+		for(int i=0;i<n1_nodes.size();i++) n1_nodes[i]->node_lock.unlock();
+		for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock();
 
 	     }
-	     if(first_node && !n2->isTailNode()) n2->node_lock.unlock();
-	     else if(!first_node) n2->node_lock.unlock();
+	     if(n1 != head.load()) n2->node_lock.unlock();
 	     n1->node_lock.unlock();
 
-	     //std::cout <<" invalid = "<<invalid<<std::endl;
-	     if(invalid || nodes.size() < 2) 
-	     {
-		    for(int i=0;i<nodes.size();i++)
-			    nodes[i]->node_lock.unlock();
-		     return false;
-	     }
 
-	     int pos = -1;
-
-	     for(int i=0;i<nodes.size();i++)
-	     {
-		if(k <= nodes[i]->key_)
-		{
-		   pos = i; break;
-		}
-	
-	     }
-
-	     if(pos==-1)
-	     {
-		  for(int i=0;i<nodes.size();i++) nodes[i]->node_lock.unlock();
-		  return false;
-	     }
-		 
-	     nn = nodes[pos]->bottom.load();
-	     nn->node_lock.lock_shared();
-	     if(nn->isBottomNode()) leaflevel = true;
-	     nn->node_lock.unlock_shared();
-
-	     if(!leaflevel)
-	     {
-	        assert (nodes.size()>=2);
-	       if(pos==0) 
-	       {
-		       for(int i=2;i<nodes.size();i++) nodes[i]->node_lock.unlock();
-		       found = Erase(nodes[pos],nodes[pos+1],true,k);
-		       return found;
-	       }
-	       else 
-	       {
-		       for(int i=0;i<pos-1;i++) nodes[i]->node_lock.unlock();
-		       for(int i=pos+1;i<nodes.size();i++) nodes[i]->node_lock.unlock();
-		       found = Erase(nodes[pos-1],nodes[pos],false,k);
-		       return found;
-	       }
-	     }
-	     else	
-     	     for(int i=0;i<nodes.size();i++) nodes[i]->node_lock.unlock();*/
+	     if(n1_next != nullptr && n2_next != nullptr)
+		     found = Erase(n1_next,n2_next,k);
 
 	     return found;
 	  }
 
 	  bool EraseData(K &k)
 	  {
-		/*skipnode<K,T> *n = head.load();
+		skipnode<K,T> *n = head.load();
 		bool valid = false;
 		bool b = false;
 
-		n->node_lock.lock_shared();
-		skipnode<K,T> *nn = n->nlink.load();
-		if(nn != n) nn->node_lock.lock_shared();
-		valid = ValidHead();
-		if(nn != n) nn->node_lock.unlock_shared();
-		n->node_lock.unlock_shared();
-
-		if(valid)
-	        {
-		   n->node_lock.lock();
-		   nn = n->nlink.load();
-		   if(nn->isTailNode())
-		   {
-		     b = Erase(n,nn,true,k);
-		   }
-		   else n->node_lock.unlock();
-		}
+		b = Erase(n,n,k);
+		
 
 		if(!b)
 		{
-		    bool dec = false;
-		    n->node_lock.lock_shared();
-		    nn = n->bottom.load();
-		    nn->node_lock.lock_shared();
-		    if(n->key_ == nn->key_ && !nn->isBottomNode())
-			dec = true;
-		    nn->node_lock.unlock_shared();
-		    n->node_lock.unlock_shared();
-		    //if(dec) DecreaseDepth();
-
-		}*/
+		   DecreaseDepth();
+		}
 
 		return false;	
 	  }
@@ -784,7 +778,7 @@ class Skiplist
 		skipnode<K,T> *nn = nullptr;
 
 		while(!n->isFullyLinked() && !n->isMarked());
-		invalid = n->isBottomNode() || n->isTailNode();
+		invalid = n->isBottomNode() || n->isTailNode() || n->isMarked();
                 skipnode<K,T> *b = n->bottom.load();
 		skipnode<K,T> *bb = b->bottom.load();
 		leaf_level = !b->isBottomNode() && bb->isBottomNode();

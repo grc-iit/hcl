@@ -20,10 +20,10 @@ struct thread_arg
 void operations(struct thread_arg *t)
 {
 	if(t->op==0)
-	for(int i=0;i<t->num_operations;i++)
+	for(int i=0;i<100;i++)
 	{
 	   int op = random()%2;
-           int key = random()%10000000;
+           int key = i+1;
 	   int data = 1;
 	   bool b = false;
 	   //std::cout <<" op = "<<op<<" key = "<<key<<std::endl;
@@ -51,23 +51,16 @@ void operations(struct thread_arg *t)
 
 	   }*/
 	}
-	/*else
+	else
 	{
-	   for(int i=0;i<t->num_operations;i++)
+	   for(int i=0;i<150;i++)
 	   {
-	      int key = random()%10000000;
+	      int key = i+1;
 	      bool b = false;
 
-	      int d=0;
-	      do
-	      {
-		  d = s->FindData(key);
-	      }while(d==0);
-
-	      //std::cout <<" key = "<<key<<std::endl;
 	      b = s->EraseData(key);
 	   }
-	}*/
+	}
 }
 
 int main(int argc, char **argv)
@@ -77,7 +70,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 1000000;
+   int num_operations = 10;
    int num_threads = 12;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
@@ -100,12 +93,13 @@ int main(int argc, char **argv)
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
 
-   /*num_threads = 12;
+   num_threads = 1;
 
    nops = num_operations/num_threads;
    rem = num_operations%num_threads;
 
    //s->check_list();
+   std::cout <<" Erase"<<std::endl;
    //auto t1 = std::chrono::high_resolution_clock::now();
 
    for(int i=0;i<num_threads;i++)
@@ -119,12 +113,12 @@ int main(int argc, char **argv)
    }
 
    for(int i=0;i<num_threads;i++)
-	   workers[i].join();*/
+	   workers[i].join();
    
    auto t2 = std::chrono::high_resolution_clock::now();
    double t = std::chrono::duration<double> (t2-t1).count();
    std::cout <<" operations = "<<num_operations<<" num_threads = "<<num_threads<<" t = "<<t<<std::endl;
-   //s->check_list();
+   s->check_list();
 
    delete s;
    delete m;
