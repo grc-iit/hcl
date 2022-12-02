@@ -34,22 +34,12 @@ void operations(struct thread_arg *t)
 	     {*/
 	      b = s->InsertData(key,data);
 
-	      b = s->FindData(key);
+	      //b = s->FindData(key);
+
+	      //b = s->EraseData(key);
 	      /*}while(!b);*/
 
 	   }
-	   /*else if(op==1)
-	   {
-	     int d = 0;
-	     
-	     do
-	     {
-		d = s->FindData(key);
-	     }while(d==0);
-
-	     //s->EraseData(key);
-
-	   }*/
 	}
 	else
 	{
@@ -58,6 +48,7 @@ void operations(struct thread_arg *t)
 	      int key = random()%10000000;
 	      bool b = false;
 
+	      b = s->FindData(key);
 	      b = s->EraseData(key);
 	   }
 	}

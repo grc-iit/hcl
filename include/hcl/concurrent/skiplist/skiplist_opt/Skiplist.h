@@ -228,7 +228,6 @@ class Skiplist
 		    
 		  b = n->bottom.load();
 		  bn = b->bottom.load();
-		  //if(n->key_ == b->key_ && !b->isBottomNode()) invalid = true;
 		  leaf_level = !b->isBottomNode() && bn->isBottomNode();
 		  if(leaf_level && k <= key)
 		  {
@@ -244,7 +243,7 @@ class Skiplist
 			    if(n_key == key ||p_n->isBottomNode()) break;
 			    p_n = (skipnode<K,T>*)k_n;
 			}
-
+			if(!(nodes.size()==1 && n==head.load()))
 			for(int i=0;i<nodes.size();i++)
 			{
 				if(keys[i] >= k)
@@ -361,7 +360,7 @@ class Skiplist
 		  return false;
 	     }
 
-             assert (nodes.size() >= 2);	     
+             assert (nodes.size() >= 2 && pos < nodes.size()-1);	     
 	     p_n = n->bottom.load();
 	     skipnode<K,T> *n1 = nodes[pos];
 	     skipnode<K,T> *n2 = nodes[pos+1];
@@ -584,6 +583,12 @@ class Skiplist
 	     while(!n1->isFullyLinked() && !n1->isMarked());
 	     if(n1 != head.load()) while(!n2->isFullyLinked() && !n2->isMarked());
 	     n1->node_lock.lock();
+	     if(n1==head.load())
+	     {
+		kn = n1->key_nlink.load();
+		skipnode<K,T> *hnext = (skipnode<K,T>*)kn;
+		invalid = !hnext->isTailNode();
+	     }
 	     if(n1 != head.load()) n2->node_lock.lock();
 	     invalid = !n1->isFullyLinked();
 	     if(n1 != head.load() && !invalid) 
@@ -642,6 +647,7 @@ class Skiplist
 			   }
 			   if(pos!=-1) 
 			   {
+				assert (n1_nodes.size() >= 2);
 				if(pos==0)
 				{
 				   n1_next = n1_nodes[0]; n2_next = n1_nodes[1];
@@ -673,7 +679,6 @@ class Skiplist
 			p_n->node_lock.lock();
 			k_n = p_n->key_nlink.load();
 			key_n = (K)(k_n >> 64);
-			//if(key1 == 1979802) std::cout <<" n1 = "<<n1<<" key1 = "<<key1<<" key_n = "<<key_n<<" head = "<<head.load()<<std::endl;
 			n1_nodes.push_back(p_n);
 			if(key_n == key1 || p_n->isBottomNode()) break;
 			p_n = (skipnode<K,T>*)k_n;
@@ -693,6 +698,8 @@ class Skiplist
 		      if(key_n == key2 || p_n->isBottomNode()) break;
 		      p_n = (skipnode<K,T>*)k_n;
 		   }
+
+		   assert (n1_nodes.size() >= 1 && n2_nodes.size() >= 1);
 
 		   if(!n1_nodes[0]->isBottomNode())
 		   {
@@ -729,14 +736,18 @@ class Skiplist
 			   }
 			   if(key_nn == key1) n1_pos = i;
 			}
-		        
-			if(pos==0 || pos-n1_pos==1)
+		      
+		        assert (nodes_n.size() >= 2);
+			//if(pos != -1 && n1_pos != -1)
 			{
+			  if(pos==0 || n1_pos != -1 && pos-n1_pos==1)
+			  {
 			    n1_next = nodes_n[pos]; n2_next = nodes_n[pos+1];
-			}
-			else 
-			{
+			  }
+			  else 
+			  {
 			    n1_next = nodes_n[pos-1]; n2_next = nodes_n[pos];
+			  }
 			}
 		        	
 		     }
@@ -764,9 +775,7 @@ class Skiplist
 		bool valid = false;
 		bool b = false;
 
-		//std::cout <<" Erase k = "<<k<<std::endl;
 		b = Erase(n,n,k);
-		//std::cout <<" Erase k end = "<<k<<std::endl;
 		
 
 		if(!b)
@@ -986,9 +995,10 @@ class Skiplist
 		skipnode<K,T> *b = head.load();
 		boost::int128_type k_n = b->key_nlink.load();
 		K key = (K)(k_n >> 64);
+		skipnode<K,T> *hnext = (skipnode<K,T>*)k_n;
 		boost::int128_type kn = b->bottom.load()->key_nlink.load();
 		K key_n = (K)(kn >> 64);
-		std::cout <<" level = "<<0<<" b data = "<<key<<" l data = "<<key_n<<std::endl;
+		std::cout <<" level = "<<0<<" b data = "<<key<<" l data = "<<key_n<<" next = "<<hnext->isTailNode()<<std::endl;
 	
 	        b = head.load()->bottom.load();
 		std::cout <<" level = "<<1<<std::endl;
@@ -999,7 +1009,8 @@ class Skiplist
 			key = (K)(k_n >> 64);
 			kn = b->bottom.load()->key_nlink.load();
 			key_n = (K)(kn >> 64);
-			std::cout <<" b data = "<<key<<" l data = "<<key_n<<std::endl;
+			hnext = (skipnode<K,T>*)kn;
+			std::cout <<" b data = "<<key<<" l data = "<<key_n<<" b = "<<hnext->isBottomNode()<<std::endl;
 			b = (skipnode<K,T>*)k_n;
 		}
 
