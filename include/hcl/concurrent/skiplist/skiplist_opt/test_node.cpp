@@ -27,29 +27,19 @@ void operations(struct thread_arg *t)
 	   int data = 1;
 	   bool b = false;
 	   //std::cout <<" op = "<<op<<" key = "<<key<<std::endl;
-	   //if(op==0)
+	   if(op==0)
 	   {
              b = false;
-	     /*do
-	     {*/
 	      b = s->InsertData(key,data);
-
-	      //b = s->FindData(key);
-
-	      //b = s->EraseData(key);
-	      /*}while(!b);*/
-
 	   }
-	}
-	else
-	{
-	   for(int i=0;i<t->num_operations;i++)
+	   else
 	   {
-	      int key = random()%10000000;
-	      bool b = false;
+	      //b = s->EraseData(key);
 
 	      b = s->FindData(key);
+
 	      b = s->EraseData(key);
+
 	   }
 	}
 }
@@ -83,7 +73,7 @@ int main(int argc, char **argv)
 
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
-
+   /*
    num_threads = 12;
 
    nops = num_operations/num_threads;
@@ -104,7 +94,7 @@ int main(int argc, char **argv)
    }
 
    for(int i=0;i<num_threads;i++)
-	   workers[i].join();
+	   workers[i].join();*/
    
    auto t2 = std::chrono::high_resolution_clock::now();
    double t = std::chrono::duration<double> (t2-t1).count();

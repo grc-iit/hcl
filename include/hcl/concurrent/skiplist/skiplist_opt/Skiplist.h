@@ -285,7 +285,7 @@ class Skiplist
 	    K key = (K)(kn >> 64);
 	    skipnode<K,T> *nn = (skipnode<K,T>*)kn;
 	    while(!nn->isFullyLinked() && !nn->isMarked());
-	    if(nn->isTailNode()) invalid = true;
+	    if(nn->isTailNode() || nn->isMarked()) invalid = true;
 	    bool inc = false;
             if(!invalid)
             {
@@ -320,8 +320,10 @@ class Skiplist
 	      {
 		//std::cout <<" decreasedepth"<<std::endl;
 		skipnode<K,T> *bb = b->bottom.load();
+                bb->node_lock.lock();
 		n->bottom.store(bb);
 		b->setFlags(0); b->setMarkNode();
+		bb->node_lock.unlock();
 		dec = true;
 	      }
 	      b->node_lock.unlock();
@@ -338,12 +340,15 @@ class Skiplist
 		return n->bottom.load()->isBottomNode();
 	  }
 
-	  bool drop_key(skipnode<K,T> *n,K &k,std::vector<skipnode<K,T>*> &nodes)
+	  bool drop_key(skipnode<K,T> *n,K &k,std::vector<skipnode<K,T>*> &nodes,bool first)
 	  {
 	     bool found = false;
 	     boost::int128_type kn,k_n;
 	     skipnode<K,T> *p_n = nullptr;
 
+	     kn = n->key_nlink.load();
+	     K keyn = (K)(kn >> 64);
+	     skipnode<K,T> *hnext = (skipnode<K,T>*)kn;
 	     int pos = -1;
 	     for(int i=0;i<nodes.size();i++)
 	     {
@@ -360,6 +365,17 @@ class Skiplist
 		  return false;
 	     }
 
+	     if(!(nodes.size() >= 2 && pos < nodes.size()-1))
+	     {
+		     std::cout <<" nodes = "<<nodes.size()<<" pos = "<<pos<<" k = "<<k<<" first = "<<first<<std::endl;
+		     std::cout <<" head = "<<head.load()<<" n = "<<n<<" next = "<<hnext->isTailNode()<<std::endl;
+		     for(int i=0;i<nodes.size();i++)
+		     {
+			kn = nodes[i]->key_nlink.load();
+			K key_n = (K)(kn >> 64);
+			std::cout <<" keyn = "<<keyn<<" key_n = "<<key_n<<std::endl;
+		     }
+	     }
              assert (nodes.size() >= 2 && pos < nodes.size()-1);	     
 	     p_n = n->bottom.load();
 	     skipnode<K,T> *n1 = nodes[pos];
@@ -590,7 +606,7 @@ class Skiplist
 		invalid = !hnext->isTailNode();
 	     }
 	     if(n1 != head.load()) n2->node_lock.lock();
-	     invalid = !n1->isFullyLinked();
+	     if(!invalid) invalid = !n1->isFullyLinked();
 	     if(n1 != head.load() && !invalid) 
 	     {
 		 invalid = !n2->isFullyLinked();
@@ -601,7 +617,7 @@ class Skiplist
 		   invalid = (key_n != k && n1->isMarked());
 		   k_n = n2->key_nlink.load();
 		   key_n = (K)(k_n >> 64);
-		   invalid = (key_n != k && n2->isMarked());
+		   if(!invalid) invalid = (key_n != k && n2->isMarked());
 		   nn = (skipnode<K,T>*)kn;
 		   if(n2!=nn) invalid = true;
 		 }
@@ -630,7 +646,7 @@ class Skiplist
 
 		   if(n1_nodes.size() > 1 && !n1_nodes[0]->isBottomNode())
 		   {
-			bool d = drop_key(n1,k,n1_nodes);
+			bool d = drop_key(n1,k,n1_nodes,true);
 
 			leaflevel = n1_nodes[0]->bottom.load()->isBottomNode();
 			if(!leaflevel)
@@ -719,11 +735,16 @@ class Skiplist
 		     nodes_n.assign(n1_nodes.begin(),n1_nodes.end());
 		     for(int i=0;i<n2_nodes.size();i++) nodes_n.push_back(n2_nodes[i]); 
 
-		     d = drop_key(n,k,nodes_n);
-		     if(!n1_nodes[0]->isBottomNode() && n1_nodes[0]->bottom.load()->isBottomNode()) leaflevel = true;
+		     kn = n->key_nlink.load();
+		     K keyn = (K)(kn >> 64); 
 
-		     if(!leaflevel)
+		     if(keyn != k)
 		     {
+		       d = drop_key(n,k,nodes_n,false);
+		       if(!n1_nodes[0]->isBottomNode() && n1_nodes[0]->bottom.load()->isBottomNode()) leaflevel = true;
+
+		       if(!leaflevel)
+		       {
 			int pos = -1;
 			int n1_pos = -1;
 			for(int i=0;i<nodes_n.size();i++)
@@ -750,6 +771,7 @@ class Skiplist
 			  }
 			}
 		        	
+		     }
 		     }
 		   }
 
