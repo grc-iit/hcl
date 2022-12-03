@@ -934,9 +934,12 @@ class Skiplist
 		std::vector<K> keys;
 		bool fully_linked = true;
 
-		while(!n->isFullyLinked() && !n->isMarked());
 		invalid = n->isBottomNode() || n->isTailNode();
-		if(n->isMarked()) invalid = true;
+		if(!invalid)
+		{
+		  while(!n->isFullyLinked() && !n->isMarked());
+		  if(n->isMarked()) invalid = true;
+		}
 		if(!invalid)
 		{
 		  boost::int128_type n_k = n->key_nlink.load();
@@ -952,7 +955,7 @@ class Skiplist
 
 		b = n->bottom.load();
 		while(!b->isFullyLinked() && !b->isMarked());
-		if(n==head.load() && b->isBottomNode()) empty = true;
+		if(b->isBottomNode() || b->isMarked()) empty = true;
 
 		if(empty) return 1;
 
@@ -962,6 +965,7 @@ class Skiplist
 		    while(!bb->isFullyLinked() && !bb->isMarked());
 		    if(!b->isBottomNode() && bb->isBottomNode()) leaflevel = true;
 		}
+		else return 0;
 
 		boost::int128_type nn = n->key_nlink.load();
 		K key_n = (K)(nn >> 64);
@@ -979,7 +983,7 @@ class Skiplist
 		      {
 			nodes.push_back(p_n); keys.push_back(key);
 		      }
-		      if(key == key_n || p_n->isBottomNode()) break;
+		      if(key >= key_n || p_n->isBottomNode() || p_n->isTailNode()) break;
 		      p_n = (skipnode<K,T>*)kn;
 		   }
 		}
