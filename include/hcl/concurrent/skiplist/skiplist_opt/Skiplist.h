@@ -220,7 +220,6 @@ class Skiplist
 		  kn = n->key_nlink.load();
 		  key = (K)(kn >> 64);
 		  p_n = (skipnode<K,T>*)kn;
-		  assert (p_n != nullptr);
 		  invalid = (n==head.load() && !p_n->isTailNode()) || n->isMarked();
 		  if(invalid)
 		  {
@@ -235,7 +234,6 @@ class Skiplist
 			p_n = b;
 			for(;;)
 			{
-			    assert (p_n != nullptr);
 			    while(!p_n->isFullyLinked() && !p_n->isMarked());
 			    p_n->node_lock.lock();
 			    nodes.push_back(p_n);
@@ -286,7 +284,6 @@ class Skiplist
 	    kn = n->key_nlink.load();
 	    K key = (K)(kn >> 64);
 	    skipnode<K,T> *nn = (skipnode<K,T>*)kn;
-	    assert (nn != nullptr);
 	    while(!nn->isFullyLinked() && !nn->isMarked());
 	    if(nn->isTailNode() || nn->isMarked()) invalid = true;
 	    bool inc = false;
@@ -313,7 +310,6 @@ class Skiplist
 	      skipnode<K,T> *n = head.load();
 	      n->node_lock.lock();
 	      skipnode<K,T> *b = n->bottom.load();
-	      assert (b != nullptr);
 	      b->node_lock.lock();
 	      bool dec = false;
 	      boost::int128_type kn = n->key_nlink.load();
@@ -324,7 +320,6 @@ class Skiplist
 	      {
 		//std::cout <<" decreasedepth"<<std::endl;
 		skipnode<K,T> *bb = b->bottom.load();
-		assert (bb != nullptr);
                 bb->node_lock.lock();
 		n->bottom.store(bb);
 		b->setFlags(0); b->setMarkNode();
@@ -370,22 +365,10 @@ class Skiplist
 		  return false;
 	     }
 
-	     /*if(!(nodes.size() >= 2 && pos < nodes.size()-1))
-	     {
-		     std::cout <<" nodes = "<<nodes.size()<<" pos = "<<pos<<" k = "<<k<<" first = "<<first<<std::endl;
-		     std::cout <<" head = "<<head.load()<<" n = "<<n<<" next = "<<hnext->isTailNode()<<std::endl;
-		     for(int i=0;i<nodes.size();i++)
-		     {
-			kn = nodes[i]->key_nlink.load();
-			K key_n = (K)(kn >> 64);
-			std::cout <<" keyn = "<<keyn<<" key_n = "<<key_n<<std::endl;
-		     }
-	     }*/
              assert (nodes.size() >= 2 && pos < nodes.size()-1);	     
 	     p_n = n->bottom.load();
 	     skipnode<K,T> *n1 = nodes[pos];
 	     skipnode<K,T> *n2 = nodes[pos+1];
-	     assert (n1 != nullptr && n2 != nullptr);
 	     n1->unsetMarkNode();
 	     K key1, key2;
 	     kn = n1->key_nlink.load();
@@ -400,7 +383,6 @@ class Skiplist
 	     p_n = n1->bottom.load();
 	     for(;;)
 	     {
-		assert (p_n != nullptr);
 		while(!p_n->isFullyLinked() && !p_n->isMarked());
 		p_n->node_lock.lock();
 		kn = p_n->key_nlink.load();
@@ -415,9 +397,8 @@ class Skiplist
 
 	     for(;;)
 	     {
-		assert (p_n != nullptr);
 		while(!p_n->isFullyLinked() && !p_n->isMarked());
-		p_n->node_lock.lock();
+		//p_n->node_lock.lock();
 		kn = p_n->key_nlink.load();
 		K key_n = (K)(kn >> 64);
 	        n2_nodes.push_back(p_n);
@@ -443,7 +424,7 @@ class Skiplist
               }
 		
 	      for(int i=0;i<n1_nodes.size();i++) n1_nodes[i]->node_lock.unlock();
-	      for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock();
+	      //for(int i=0;i<n2_nodes.size();i++) n2_nodes[i]->node_lock.unlock();
 	
 	      return true;
 	  }
@@ -464,7 +445,6 @@ class Skiplist
 	     skipnode<K,T>* n2_n = (skipnode<K,T>*)k_n;
 	     key2 = (K)(k_n >> 64);
 	     bool n2_d = false;
-	     assert (n1_n != nullptr && n2_n != nullptr);
 	     if(first_node)
 	     {
 		    assert (n1_nodes.size() > 0 && n2_nodes.size() > 0);
@@ -647,7 +627,6 @@ class Skiplist
 
 		   for(;;)
 		   {
-		     assert (p_n != nullptr);
 		     while(!p_n->isFullyLinked() && !p_n->isMarked());
 		     p_n->node_lock.lock();
 		     k_n = p_n->key_nlink.load();
@@ -700,11 +679,8 @@ class Skiplist
 		   key1 = (K)(kn >> 64);
 		   K key_n;
 
-		   //std::cout <<" n1 = "<<n1<<" n2 = "<<n2<<std::endl;
-
 		   for(;;)
 		   {
-			assert (p_n != nullptr);
 			while(!p_n->isFullyLinked() && !p_n->isMarked());
 			p_n->node_lock.lock();
 			k_n = p_n->key_nlink.load();
@@ -720,7 +696,6 @@ class Skiplist
 
 		   for(;;)
 		   {
-		      assert (p_n != nullptr);
 		      while(!p_n->isFullyLinked() && !p_n->isMarked());
 		      p_n->node_lock.lock();
 		      k_n = p_n->key_nlink.load();
@@ -774,7 +749,6 @@ class Skiplist
 			}
 		      
 		        assert (nodes_n.size() >= 2);
-			//if(pos != -1 && n1_pos != -1)
 			{
 			  if(pos==0 || pos != -1 && n1_pos != -1 && pos-n1_pos==1)
 			  {
@@ -983,6 +957,7 @@ class Skiplist
 		      {
 			nodes.push_back(p_n); keys.push_back(key);
 		      }
+		      else break;
 		      if(key >= key_n || p_n->isBottomNode() || p_n->isTailNode()) break;
 		      p_n = (skipnode<K,T>*)kn;
 		   }

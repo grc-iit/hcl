@@ -22,22 +22,22 @@ void operations(struct thread_arg *t)
 	if(t->op==0)
 	for(int i=0;i<t->num_operations;i++)
 	{
-	   int op = random()%2;
+	   int op = random()%3;
            int key = random()%10000000;
 	   int data = 1;
 	   bool b = false;
 	   //std::cout <<" op = "<<op<<" key = "<<key<<std::endl;
 	   if(op==0)
 	   {
-              b = false;
 	      b = s->InsertData(key,data);
 	   }
-	   else
+	   else if(op==1)
 	   {
-	      //b = s->EraseData(key);
 
-	      //b = s->FindData(key);
-
+	      b = s->FindData(key);
+	   }
+           else
+	   {
 	      b = s->EraseData(key);
 
 	   }
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 100000;
+   int num_operations = 1000000;
    int num_threads = 12;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
@@ -73,28 +73,6 @@ int main(int argc, char **argv)
 
    for(int i=0;i<num_threads;i++)
 	   workers[i].join();
-   /*
-   num_threads = 12;
-
-   nops = num_operations/num_threads;
-   rem = num_operations%num_threads;
-
-   //s->check_list();
-   std::cout <<" Erase"<<std::endl;
-   //auto t1 = std::chrono::high_resolution_clock::now();
-
-   for(int i=0;i<num_threads;i++)
-   {
-	t_args[i].tid = i;
-	t_args[i].op = 2;
-	if(i < rem) t_args[i].num_operations = nops+1;
-	else t_args[i].num_operations = nops;
-	std::thread t{operations,&t_args[i]};
-	workers[i] = std::move(t);
-   }
-
-   for(int i=0;i<num_threads;i++)
-	   workers[i].join();*/
    
    auto t2 = std::chrono::high_resolution_clock::now();
    double t = std::chrono::duration<double> (t2-t1).count();
