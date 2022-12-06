@@ -19,10 +19,11 @@ struct thread_arg
 
 void operations(struct thread_arg *t)
 {
+	srand(t->tid);
 	if(t->op==0)
 	for(int i=0;i<t->num_operations;i++)
 	{
-	   int op = random()%3;
+	   int op = random()%2;
            int key = random()%10000000;
 	   int data = 1;
 	   bool b = false;
@@ -35,6 +36,7 @@ void operations(struct thread_arg *t)
 	   {
 
 	      b = s->FindData(key);
+	      b = s->EraseData(key);
 	   }
            else
 	   {
@@ -52,7 +54,7 @@ int main(int argc, char **argv)
    s = new Skiplist<int,int>(m);
 
    int num_operations = 1000000;
-   int num_threads = 12;
+   int num_threads = 1;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
 
