@@ -36,7 +36,6 @@ void operations(struct thread_arg *t)
 	   {
 
 	      b = s->FindData(key);
-	      b = s->EraseData(key);
 	   }
            else
 	   {
@@ -53,8 +52,8 @@ int main(int argc, char **argv)
 
    s = new Skiplist<int,int>(m);
 
-   int num_operations = 1000000;
-   int num_threads = 1;
+   int num_operations = 100000;
+   int num_threads = 12;
    int nops = num_operations/num_threads;
    int rem = num_operations%num_threads;
 

@@ -142,7 +142,6 @@ class Skiplist
 		   t->setFullyLinked();
 		   t_b->setFullyLinked();
 		   if(bn) added = true;
-		   
 		   if(!added) 
 		   {
 		      pl->memory_pool_push(t); pl->memory_pool_push(t_b);
@@ -572,10 +571,9 @@ class Skiplist
 
 	  }
 
-	  bool Erase(skipnode<K,T> *n1, skipnode<K,T> *n2, K &k)
+	  int Erase(skipnode<K,T> *n1, skipnode<K,T> *n2, K &k)
 	  {
-	     bool found = false;
-
+	     int found = 0;
 	     bool invalid = false;
 	     bool leaflevel = false;
 	     skipnode<K,T> *nn = nullptr;
@@ -641,6 +639,7 @@ class Skiplist
 			bool d = drop_key(n1,k,n1_nodes,true);
 
 			leaflevel = n1_nodes[0]->bottom.load()->isBottomNode();
+			if(leaflevel) found = (d==true) ? 2 : 1;
 			if(!leaflevel)
 			{
 			   int pos = -1;
@@ -733,6 +732,7 @@ class Skiplist
 		       d = drop_key(n,k,nodes_n,false);
 		       if(!n1_nodes[0]->isBottomNode() && n1_nodes[0]->bottom.load()->isBottomNode()) leaflevel = true;
 
+		       if(leaflevel) found = (d==true) ? 2 : 1;
 		       if(!leaflevel)
 		       {
 			int pos = -1;
@@ -776,6 +776,7 @@ class Skiplist
 	     if(n1 != head.load()) n2->node_lock.unlock();
 	     n1->node_lock.unlock();
 
+	     if(invalid) found = 0;
 
 	     if(n1_next != nullptr && n2_next != nullptr)
 		     found = Erase(n1_next,n2_next,k);
@@ -787,16 +788,23 @@ class Skiplist
 	  {
 		skipnode<K,T> *n = head.load();
 		bool valid = false;
-		bool b = false;
+		int b = 0;
 
-		b = Erase(n,n,k);
-		
+		while(true)
+	  	{
+		   b = Erase(n,n,k);
 
-		if(!b)
-		{
-		   DecreaseDepth();
+		   if(b==1 || b==2) break;
+		   else DecreaseDepth();
 		}
 
+		skipnode<K,T> *nb = n->bottom.load();
+		boost::int128_type kn = n->key_nlink.load();
+		boost::int128_type k_n = nb->key_nlink.load();
+		K key1 = (K)(kn >> 64); 
+		K key2 = (K)(k_n >> 64);
+		if(key1 == key2 && !nb->isBottomNode()) DecreaseDepth();
+		
 		return false;	
 	  }
 
@@ -823,9 +831,10 @@ class Skiplist
 		bool d = false;
 		if(leaf_level)
 		{
-		   d = addleafnode(n,k,data);
+		   bool f = false;
+		   f = addleafnode(n,k,data);
 		   d = add_node(n,k,data);
-		   return d;
+		   return f;
 		}
 		else
 		{
@@ -880,12 +889,17 @@ class Skiplist
 	     skipnode<K,T> *nn = nullptr;
 	     bool valid = false;
 		
-	     //std::cout <<"Insert k = "<<k<<std::endl;
+	     while(true)
+	     {
+		n = head.load();
 	        b = Insert(n,k,data);
-		//std::cout <<" Insert = "<<k<<std::endl;
+		if(b) break;
+		if(!b) IncreaseDepth();
+	     }
 
-		if(!b)	 
-		IncreaseDepth();
+	     boost::int128_type kn = n->key_nlink.load();
+             nn = (skipnode<K,T>*)kn;
+	     if(!nn->isTailNode()) IncreaseDepth();
 
 	     return b;
 	  }
@@ -1002,8 +1016,13 @@ class Skiplist
 	      int b = 0;
               bool valid = false;	
 	      skipnode<K,T> *n = head.load();
-		
-	      b = Find(n,k);
+
+	      while(true)
+	      {
+		n = head.load();	      
+	        b = Find(n,k);
+		if(b==1 || b==2) break;
+	      }
 	      return b;
 	  }
 	  void check_list()
