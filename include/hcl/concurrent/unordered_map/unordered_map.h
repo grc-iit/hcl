@@ -138,7 +138,6 @@ class unordered_map_concurrent : public container
   {
     if(my_table != nullptr) delete my_table;
     if(pl != nullptr) delete pl;  
-    this->container::~container(); 
   }
 
   void construct_shared_memory() override 
@@ -221,10 +220,8 @@ class unordered_map_concurrent : public container
     pl = nullptr;
     AutoTrace trace = AutoTrace("hcl::map");
     if (is_server) {
-      construct_shared_memory();
       bind_functions();
     } else if (!is_server && server_on_node) {
-      open_shared_memory();
     }
   }
 

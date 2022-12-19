@@ -119,7 +119,6 @@ class concurrent_skiplist : public container
 	{
 	   if(a != nullptr) delete a;
 	   if(s != nullptr) delete s;
-	   this->container::~container();
 	}
 	
 	void construct_shared_memory() override
@@ -184,12 +183,10 @@ class concurrent_skiplist : public container
     	AutoTrace trace = AutoTrace("hcl::concurrent_skiplist");
     	if(is_server)
     	{
-      	  construct_shared_memory();
       	  bind_functions();
         }
     	else if (!is_server && server_on_node)
         {
-      	  open_shared_memory();
         }
      }
 

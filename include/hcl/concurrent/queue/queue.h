@@ -68,7 +68,6 @@ private:
   ~queue_concurrent() 
   {
     if(queue != nullptr) delete queue;
-    this->container::~container(); 
   }
 
   void construct_shared_memory() override 
@@ -127,12 +126,10 @@ private:
     if (is_server) 
     {
       queue = new queue_type (1024);
-      construct_shared_memory();
       bind_functions();
     } 
     else if (!is_server && server_on_node) 
     {
-      open_shared_memory();
     }
   }
 
