@@ -38,7 +38,7 @@ struct thread_arg
   int num_operations;
 };
 
-hcl::unordered_map_concurrent<int,int> *block_map;
+hcl::concurrent_unordered_map<int,int> *block_map;
 
 void map_operations(struct thread_arg *t)
 {
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
   rd.seed(my_rank);
   auto die = std::bind(dist,rd);
 
-  block_map = new hcl::unordered_map_concurrent<int,int>();
+  block_map = new hcl::concurrent_unordered_map<int,int>();
 
   uint64_t total_size = 8192;
   block_map->initialize_tables(total_size,num_servers,my_server,INT32_MAX);

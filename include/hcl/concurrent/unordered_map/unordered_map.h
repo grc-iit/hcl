@@ -10,8 +10,8 @@
  * have access to the file, you may request a copy from help@hdfgroup.org.   *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef INCLUDE_HCL_UNORDERED_MAP_CONCURRENT_H_
-#define INCLUDE_HCL_UNORDERED_MAP_CONCURRENT_H_
+#ifndef INCLUDE_HCL_CONCURRENT_UNORDERED_MAP_H_
+#define INCLUDE_HCL_CONCURRENT_UNORDERED_MAP_H_
 
 /**
  * Include Headers
@@ -51,13 +51,15 @@
 #include <float.h>
 #include "../../base/containers/concurrent_unordered_map/block_map.h"
 
+/*This file contains the class that implements a distributed concurrent unordered map of fixed size. The total size of the map can be configured by the user. The map is partitioned and distributed across servers. A client program can use the HCL container to locate the server containing a key and make an RPC call for remote map operations. The unordered map on each server is concurrent, which means it can be accessed by multiple threads simultaneously.*/
+
 namespace hcl {
 
 template <class KeyT, 
 	  class ValueT,
 	  class HashFcn=std::hash<KeyT>,
 	  class EqualFcn=std::equal_to<KeyT>>
-class unordered_map_concurrent : public container 
+class concurrent_unordered_map : public container 
 {
   public :
       typedef BlockMap<KeyT,ValueT,HashFcn,EqualFcn> map_type;
@@ -134,7 +136,7 @@ class unordered_map_concurrent : public container
 
    }
 
-  ~unordered_map_concurrent() 
+  ~concurrent_unordered_map() 
   {
     if(my_table != nullptr) delete my_table;
     if(pl != nullptr) delete pl;  
@@ -154,19 +156,19 @@ class unordered_map_concurrent : public container
 #ifdef HCL_ENABLE_RPCLIB
       case RPCLIB: {
         std::function<bool(KeyT &, ValueT &)> insertFunc(
-            std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::LocalInsert, this,
+            std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::LocalInsert, this,
                       std::placeholders::_1, std::placeholders::_2));
         std::function<bool(KeyT &)> findFunc(
-            std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::LocalFind, this,
+            std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::LocalFind, this,
                       std::placeholders::_1));
         std::function<bool(KeyT &)> eraseFunc(
-            std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::LocalErase, this,
+            std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::LocalErase, this,
                       std::placeholders::_1));
 	std::function<ValueT(KeyT&)> getFunc(
-	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalGetValue, this,
+	   std::bind(&concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::LocalGetValue, this,
 		   std::placeholders::_1));
 	std::function<bool(KeyT&,ValueT&)>updateFunc(
-	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::LocalUpdate, this,
+	   std::bind(&concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::LocalUpdate, this,
 		 std::placeholders::_1,std::placeholders::_2));
 
         rpc->bind(func_prefix + "_Insert", insertFunc);
@@ -187,19 +189,19 @@ class unordered_map_concurrent : public container
       {
 
         std::function<void(const tl::request &, KeyT &, ValueT &)> insertFunc(
-	   std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalInsert,
+	   std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalInsert,
            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3));
         std::function<void(const tl::request &, KeyT &)> findFunc(
-            std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalFind,
+            std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalFind,
                       this, std::placeholders::_1, std::placeholders::_2));
         std::function<void(const tl::request &, KeyT &)> eraseFunc(
-            std::bind(&unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalErase,
+            std::bind(&concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::ThalliumLocalErase,
                       this, std::placeholders::_1, std::placeholders::_2));
 	std::function<void(const tl::request &, KeyT &)> getFunc(
-	    std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalGetValue,
+	    std::bind(&concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalGetValue,
 		      this, std::placeholders::_1, std::placeholders::_2));
 	std::function<void(const tl::request &, KeyT &, ValueT &)> updateFunc(
-	   std::bind(&unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalUpdate,
+	   std::bind(&concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::ThalliumLocalUpdate,
 		     this,std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
         rpc->bind(func_prefix + "_Insert", insertFunc);
@@ -213,7 +215,7 @@ class unordered_map_concurrent : public container
     }
   }
 
-  explicit unordered_map_concurrent(CharStruct name_ = "TEST_UNORDERED_MAP_CONCURRENT",uint16_t port = HCL_CONF->RPC_PORT)
+  explicit concurrent_unordered_map(CharStruct name_ = "TEST_UNORDERED_MAP_CONCURRENT",uint16_t port = HCL_CONF->RPC_PORT)
       : container(name_, port)
   {
     my_table = nullptr;

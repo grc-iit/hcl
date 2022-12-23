@@ -10,8 +10,8 @@
  * have access to the file, you may request a copy from help@hdfgroup.org.   *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef INCLUDE_HCL_QUEUE_CONCURRENT_H_
-#define INCLUDE_HCL_QUEUE_CONCURRENT_H_
+#ifndef INCLUDE_HCL_CONCURRENT_QUEUE_H_
+#define INCLUDE_HCL_CONCURRENT_QUEUE_H_
 
 /**
  * Include Headers
@@ -51,10 +51,12 @@
 #include <vector>
 #include <float.h>
 
+/*This file contains the class that implements a distributed queue, distributed across all servers. A client can choose any of the servers and make an RPC call to perform queue operations.*/
+
 namespace hcl {
 
 template <class ValueT>
-class queue_concurrent : public container 
+class concurrent_queue : public container 
 {
 
 public:
@@ -65,7 +67,7 @@ private:
 
  public:
 
-  ~queue_concurrent() 
+  ~concurrent_queue() 
   {
     if(queue != nullptr) delete queue;
   }
@@ -84,10 +86,10 @@ private:
 #ifdef HCL_ENABLE_RPCLIB
       case RPCLIB: {
         std::function<bool(ValueT &)> pushFunc(
-            std::bind(&queue_concurrent<ValueT>::LocalPush, this,
+            std::bind(&concurrent_queue<ValueT>::LocalPush, this,
                       std::placeholders::_1));
         std::function<std::pair<bool,ValueT>(void)> popFunc(
-            std::bind(&queue_concurrent<ValueT>::LocalPop, this));
+            std::bind(&concurrent_queue<ValueT>::LocalPop, this));
 
         rpc->bind(func_prefix + "_Push", pushFunc);
         rpc->bind(func_prefix + "_Pop", popFunc);
@@ -104,10 +106,10 @@ private:
       {
 
         std::function<void(const tl::request &, ValueT &)> pushFunc(
-	   std::bind(&queue_concurrent<ValueT>::ThalliumLocalPush,
+	   std::bind(&concurrent_queue<ValueT>::ThalliumLocalPush,
            this, std::placeholders::_1,std::placeholders::_2));
         std::function<void(const tl::request &)> popFunc(
-            std::bind(&queue_concurrent<ValueT>::ThalliumLocalPop,
+            std::bind(&concurrent_queue<ValueT>::ThalliumLocalPop,
                       this, std::placeholders::_1));
 
         rpc->bind(func_prefix + "_Push", pushFunc);
@@ -118,11 +120,11 @@ private:
     }
   }
 
-  explicit queue_concurrent(CharStruct name_ = "TEST_QUEUE_CONCURRENT",uint16_t port = HCL_CONF->RPC_PORT)
+  explicit concurrent_queue(CharStruct name_ = "TEST_CONCURRENT_QUEUE",uint16_t port = HCL_CONF->RPC_PORT)
       : container(name_, port)
   {
     queue = nullptr;
-    AutoTrace trace = AutoTrace("hcl::queue_concurrent");
+    AutoTrace trace = AutoTrace("hcl::concurrent_queue");
     if (is_server) 
     {
       queue = new queue_type (1024);

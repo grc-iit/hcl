@@ -10,46 +10,46 @@
  * have access to the file, you may request a copy from help@hdfgroup.org.   *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef INCLUDE_HCL_UNORDERED_MAP_CONCURRENT_CPP_
-#define INCLUDE_HCL_UNORDERED_MAP_CONCURRENT_CPP_
+#ifndef INCLUDE_HCL_CONCURRENT_UNORDERED_MAP_CPP_
+#define INCLUDE_HCL_CONCURRENT_UNORDERED_MAP_CPP_
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
-bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Insert(uint64_t& s,KeyT &key, ValueT &data) 
+bool concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::Insert(uint64_t& s,KeyT &key, ValueT &data) 
 {
   uint16_t key_int = static_cast<uint16_t>(s);
-  AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Insert(remote)", key, data);
+  AutoTrace trace = AutoTrace("hcl::concurrent_unordered_map::Insert(remote)", key, data);
   return RPC_CALL_WRAPPER("_Insert", key_int,bool, key, data);
 }
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
-bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Find(uint64_t &s,KeyT &key) 
+bool concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::Find(uint64_t &s,KeyT &key) 
 {
   uint16_t key_int = static_cast<uint16_t>(s);
-  AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Find(remote)", key);
+  AutoTrace trace = AutoTrace("hcl::concurrent_unordered_map::Find(remote)", key);
   return RPC_CALL_WRAPPER("_Find", key_int,bool, key);
 }
 
 template <typename KeyT, typename ValueT,typename HashFcn,typename EqualFcn>
-bool unordered_map_concurrent<KeyT, ValueT,HashFcn,EqualFcn>::Erase(uint64_t &s,KeyT &key) 
+bool concurrent_unordered_map<KeyT, ValueT,HashFcn,EqualFcn>::Erase(uint64_t &s,KeyT &key) 
 {
   uint16_t key_int = static_cast<uint16_t>(s);
-  AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Erase(remote)", key);
+  AutoTrace trace = AutoTrace("hcl::concurrent_unordered_map::Erase(remote)", key);
   return RPC_CALL_WRAPPER("_Erase", key_int,bool, key);
 }
 
 template <typename KeyT, typename ValueT, typename HashFcn, typename EqualFcn>
-ValueT unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Get(uint64_t &s, KeyT &key)
+ValueT concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::Get(uint64_t &s, KeyT &key)
 {
    uint16_t key_int = static_cast<uint16_t>(s);
-   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Get(remote)",key);
+   AutoTrace trace = AutoTrace("hcl::concurrent_unordered_map::Get(remote)",key);
    return RPC_CALL_WRAPPER("_Get",key_int,ValueT,key);
 }
 
 template<typename KeyT, typename ValueT, typename HashFcn, typename EqualFcn>
-bool unordered_map_concurrent<KeyT,ValueT,HashFcn,EqualFcn>::Update(uint64_t &s,KeyT &key,ValueT &data)
+bool concurrent_unordered_map<KeyT,ValueT,HashFcn,EqualFcn>::Update(uint64_t &s,KeyT &key,ValueT &data)
 {
    uint16_t key_int = static_cast<uint16_t>(s);
-   AutoTrace trace = AutoTrace("hcl::unordered_map_concurrent::Update(remote)",key,data);
+   AutoTrace trace = AutoTrace("hcl::concurrent_unordered_map::Update(remote)",key,data);
    return RPC_CALL_WRAPPER("_Update",key_int,bool,key,data);
 }
 

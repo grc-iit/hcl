@@ -11,6 +11,11 @@
 
 #define MIN_FREE_NODES 100
 
+/* This module is used by the concurrent unordered map container for memory management. 
+ * It allocates nodes and reuses them to keep the total memory allocation the program under check.
+ * Since the container is concurrent, the allocated nodes are kept in two concurrent queues : active and free
+ * The active queue contains nodes available for the unordered map and the free queue contains nodes that have been deleted by the map. Nodes are moved from the free queue to the active queue when the number of available nodes goes to zero*/
+
 namespace hcl
 {
 

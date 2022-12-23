@@ -18,6 +18,8 @@
 #define EXISTS 1
 #define INSERTED 0
 
+/*This file contains the shared memory implementation of the concurrent unordered map, which is distributed using HCL RPC wrappers. It is a static unordered map of fixed size - which removes the complexities of rehashing. The nodes of the unordered map are allocated and reused using a memory allocator*/ 
+
 namespace hcl
 {
 

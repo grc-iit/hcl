@@ -12,7 +12,7 @@
 
 #include <execinfo.h>
 #include <hcl/common/data_structures.h>
-#include <hcl/concurrent/skiplist/skiplist_random/concurrent_skiplist.h>
+#include <hcl/concurrent/skiplist/skiplist.h>
 #include <mpi.h>
 #include <signal.h>
 #include <sys/types.h>

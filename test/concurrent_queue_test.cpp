@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
   HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
   HCL_CONF->SERVER_LIST_PATH = "./server_list";
 
-  hcl::queue_concurrent<int> *queue = new hcl::queue_concurrent<int> ();
+  hcl::concurrent_queue<int> *queue = new hcl::concurrent_queue<int> ();
 
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Comm client_comm;
