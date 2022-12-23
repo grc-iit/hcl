@@ -49,7 +49,7 @@
 #include <utility>
 #include <vector>
 #include <float.h>
-#include "Block_chain_memory.h"
+#include "../../base/containers/block_map.h"
 
 namespace hcl {
 

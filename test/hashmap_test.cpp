@@ -17,11 +17,10 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
-
+#include <thread>
 #include <chrono>
 #include <functional>
 #include <iostream>
-#include <map>
 #include <utility>
 #include <random>
 #include <cassert>
@@ -32,6 +31,28 @@ void serialize(A &ar, int &a) {
   ar &a;
 }
 #endif
+
+struct thread_arg
+{
+  int tid;
+  int num_operations;
+};
+
+hcl::unordered_map_concurrent<int,int> *block_map;
+
+void map_operations(struct thread_arg *t)
+{
+
+  for(int i=0;i<t->num_operations;i++)
+  {
+       uint32_t op = random()%3;
+       int k = random()%100000;
+       if(op==0) uint32_t ret = block_map->LocalInsert(k,k);
+       else if(op==1) bool s = block_map->LocalFind(k);
+       else if(op==2) bool s = block_map->LocalErase(k);
+  }
+
+}
 
 int main(int argc, char *argv[]) {
   int provided;
@@ -56,11 +77,13 @@ int main(int argc, char *argv[]) {
   int len;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   MPI_Get_processor_name(processor_name, &len);
-  if (debug) {
+  if (debug) 
+  {
     printf("%s/%d: %d\n", processor_name, my_rank, getpid());
   }
 
-  if (debug && my_rank == 0) {
+  if (debug && my_rank == 0) 
+  {
     printf("%d ready for attach\n", comm_size);
     fflush(stdout);
     getchar();
@@ -100,29 +123,52 @@ int main(int argc, char *argv[]) {
   rd.seed(my_rank);
   auto die = std::bind(dist,rd);
 
-  hcl::unordered_map_concurrent<int,int> *map = new hcl::unordered_map_concurrent<int,int>();
+  block_map = new hcl::unordered_map_concurrent<int,int>();
 
   uint64_t total_size = 8192;
-  map->initialize_tables(total_size,num_servers,my_server,INT32_MAX);
+  block_map->initialize_tables(total_size,num_servers,my_server,INT32_MAX);
 
   MPI_Barrier(MPI_COMM_WORLD);
    
   num_request = 1000000;
 
-  MPI_Comm client_comm;
-  MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);
-  int client_comm_size;
-  int client_rank;
-  MPI_Comm_size(client_comm, &client_comm_size);
-  MPI_Comm_rank(client_comm, &client_rank);
-
-  int num_ops = num_request / client_comm_size;
-  int rem = num_request % client_comm_size;
-  if(client_rank < rem) num_ops++;
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (!is_server) 
+  if(comm_size==1)
   {
+       int num_threads = 12;
+       std::vector<struct thread_arg> t_args(num_threads);
+       std::vector<std::thread> workers(num_threads);
+
+       int num_ops = num_request/num_threads;
+       int rem = num_request%num_threads;
+
+       for(int i=0;i<num_threads;i++)
+       {
+	    t_args[i].tid = i;
+	    if(i < rem) t_args[i].num_operations = num_ops+1;
+	    else t_args[i].num_operations = num_ops;
+	    std::thread t{map_operations,&t_args[i]};
+	    workers[i] = std::move(t);
+       }
+
+       for(int i=0;i<num_threads;i++)
+	       workers[i].join();
+  }
+  else
+  {
+    MPI_Comm client_comm;
+    MPI_Comm_split(MPI_COMM_WORLD, !is_server, my_rank, &client_comm);
+    int client_comm_size;
+    int client_rank;
+    MPI_Comm_size(client_comm, &client_comm_size);
+    MPI_Comm_rank(client_comm, &client_rank);
+
+    int num_ops = num_request / client_comm_size;
+    int rem = num_request % client_comm_size;
+    if(client_rank < rem) num_ops++;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (!is_server) 
+   {
 
     MPI_Barrier(client_comm);
     auto t1 = std::chrono::high_resolution_clock::now(); 
@@ -133,20 +179,20 @@ int main(int argc, char *argv[]) {
 	if(op==0)
 	{
 	    int k = dist(rd);
-	    uint64_t r = map->serverLocation(k);
-	    bool s = map->Insert(r,k,k);
+	    uint64_t r = block_map->serverLocation(k);
+	    bool s = block_map->Insert(r,k,k);
 	}
 	else if(op==1)
 	{
 	   int k = dist(rd);
-	   uint64_t r = map->serverLocation(k);
-	   bool s = map->Find(r,k);
+	   uint64_t r = block_map->serverLocation(k);
+	   bool s = block_map->Find(r,k);
 	}
 	else if(op==2)
 	{
 	  int k = dist(rd);
-	  uint64_t r = map->serverLocation(k);
-	  bool s = map->Erase(r,k);
+	  uint64_t r = block_map->serverLocation(k);
+	  bool s = block_map->Erase(r,k);
 	}
     }
 
@@ -157,12 +203,12 @@ int main(int argc, char *argv[]) {
     double total_time = 0;
     MPI_Allreduce(&t,&total_time,1,MPI_DOUBLE,MPI_MAX,client_comm);
     if(client_rank==0) std::cout <<" Number of request = "<<num_request<<" Total time taken = "<<t<<" seconds"<<std::endl;
-
+   }
   }
   MPI_Barrier(MPI_COMM_WORLD);
   if(is_server) 
-    std::cout <<" Number of elements allocated = "<<map->allocated()<<" removed = "<<map->removed()<<std::endl;
-  delete (map);
+    std::cout <<" Number of elements allocated = "<<block_map->allocated()<<" removed = "<<block_map->removed()<<std::endl;
+  delete (block_map);
   MPI_Finalize();
   exit(EXIT_SUCCESS);
 }
