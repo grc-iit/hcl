@@ -49,7 +49,7 @@
 #include <utility>
 #include <vector>
 #include <float.h>
-#include "../../base/containers/block_map.h"
+#include "../../base/containers/concurrent_unordered_map/block_map.h"
 
 namespace hcl {
 

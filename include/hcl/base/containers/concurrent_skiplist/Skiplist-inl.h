@@ -1,5 +1,5 @@
-
-#pragma once
+#ifndef HCL_SKIPLIST_INL_H
+#define HCL_SKIPLIST_INL_H
 
 #include <algorithm>
 #include <atomic>
@@ -16,7 +16,6 @@
 #include<boost/thread/lock_types.hpp>
 #include<boost/thread/shared_mutex.hpp>
 #include <boost/random.hpp>
-
 
 template <typename ValT, typename NodeT>
 class csl_iterator;
@@ -380,4 +379,4 @@ class NodeRecycler<NodeType,NodeAlloc>//,typename std::enable_if<!NodeType::temp
   int chunk_size;
 };
 
-
+#endif
