@@ -3,6 +3,8 @@
 
 #include "Skiplist-inl.h"
 
+/*This file contains the class that implements a concurrent randomized skiplist. It is based on folly's skiplist implementation. But we diverged a bit from folly. We have used a custom memory management module based on lockfree queues to recycle used nodes. We have also used locks from boost, instead of microlocks in folly. Folly's implementation is based on the skiplist algorithm with optimistic locks which uses linked and mark bits to indicate linked/deleted nodes. This algorithm avoids locks during search/find operations, but acquires locks for insertion/deletion*/ 
+
 template <typename T,typename Comp = std::less<T>,typename NodeAlloc = std::allocator<char>,int MAX_HEIGHT = 24>
 class ConcurrentSkipList 
 {
