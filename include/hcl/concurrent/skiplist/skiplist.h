@@ -49,7 +49,7 @@
 #include <utility>
 #include <vector>
 #include <float.h>
-#include "../../base/containers/concurrent_skiplist/Skiplist.h"
+#include "../../base/containers/concurrent_skiplist/skip_list.h"
 
 /*This file contains the class that implements a distributed concurrent set. The total size of the set is not fixed. Each server has a set. The total key space is partitioned across servers using the upper log(n) bits where 'n' is the number of servers. A client program should locate the server for its key and make RPC calls to it for performing set operations. The underlying set is implemented using a concurrent randomized skiplist. The skiplist can be accessed concurrently using multiple threads.*/
 
