@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
    
-  num_request = 1000000;
+  num_request = 100000;
 
   if(comm_size==1)
   {
