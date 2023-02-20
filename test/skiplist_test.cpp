@@ -23,6 +23,8 @@
 #include <iostream>
 #include <utility>
 #include <random>
+#include <set>
+#include <mutex>
 
 struct thread_arg
 {
@@ -30,9 +32,35 @@ struct thread_arg
   int num_operations;
 };
 
+std::mutex m;
+std::set<int> *stl_set;
 hcl::concurrent_skiplist<int> *s;
 
-void set_operations(struct thread_arg *t)
+void stl_set_operations(struct thread_arg *t)
+{
+   for(int i=0;i<t->num_operations;i++)
+   {
+	int op = random()%3;
+	int k = random()%1000000;
+
+	m.lock();
+	if(op==0)
+	{
+	    stl_set->insert(k);
+	}
+	else if(op==1)
+	{
+	   stl_set->find(k);
+	}
+	else if(op==2)
+	{
+	  stl_set->erase(k);
+	}
+	m.unlock();
+   }
+}
+
+void hcl_set_operations(struct thread_arg *t)
 {
 
   for(int i=0;i<t->num_operations;i++)
@@ -102,6 +130,7 @@ int main(int argc, char *argv[]) {
   HCL_CONF->SERVER_ON_NODE = server_on_node || is_server;
   HCL_CONF->SERVER_LIST_PATH = "./server_list";
 
+  stl_set = new std::set<int> ();
   s = new hcl::concurrent_skiplist<int> ();
 
   s->initialize_sets(num_servers,my_server);
@@ -109,6 +138,7 @@ int main(int argc, char *argv[]) {
   double local_set_throughput_l=0,local_set_throughput=0;
   double elapsed_time =0;
   double remote_set_throughput_l=0,remote_set_throughput=0;
+  double baseline_l=0,baseline=0;
 
   if(is_server)
   {
@@ -126,18 +156,35 @@ int main(int argc, char *argv[]) {
        t_args[i].tid = i;
        if(i < rem) t_args[i].num_operations = num_ops+1;
        else t_args[i].num_operations = num_ops;
-       std::thread t{set_operations,&t_args[i]};
+       std::thread t{stl_set_operations,&t_args[i]};
+       workers[i] = std::move(t);
+    }
+
+    for(int i=0;i<num_threads;i++)
+	    workers[i].join();
+    auto t2 = std::chrono::high_resolution_clock::now();
+    elapsed_time = std::chrono::duration<double>(t2-t1).count();
+    baseline_l = num_request/elapsed_time;
+
+    t1 = std::chrono::high_resolution_clock::now();
+    for(int i=0;i<num_threads;i++)
+    {
+       t_args[i].tid = i;
+       if(i < rem) t_args[i].num_operations = num_ops+1;
+       else t_args[i].num_operations = num_ops;
+       std::thread t{hcl_set_operations,&t_args[i]};
        workers[i] = std::move(t);
     }
 
     for(int i=0;i<num_threads;i++)
            workers[i].join();
 
-    auto t2 = std::chrono::high_resolution_clock::now();
+    t2 = std::chrono::high_resolution_clock::now();
     elapsed_time = std::chrono::duration<double>(t2-t1).count();
     local_set_throughput_l = (double) num_request / elapsed_time;
   }
-
+  MPI_Allreduce(&baseline_l,&baseline,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  if(my_rank==0) std::cout <<" Baseline throughput = "<<baseline<<" reqs/sec"<<std::endl;
   MPI_Allreduce(&local_set_throughput_l,&local_set_throughput,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
   if(my_rank==0) std::cout <<" Local_operations_throughput = "<<local_set_throughput<<" reqs/sec"<<std::endl;
 
@@ -190,6 +237,7 @@ int main(int argc, char *argv[]) {
   MPI_Allreduce(&remote_set_throughput_l,&remote_set_throughput,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
   if(my_rank==0) std::cout <<" Remote_operations_throughput = "<<remote_set_throughput<<" reqs/sec"<<std::endl;
   delete (s);
+  delete (stl_set);
   MPI_Finalize();
   exit(EXIT_SUCCESS);
 }

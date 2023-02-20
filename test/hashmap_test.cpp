@@ -24,6 +24,8 @@
 #include <utility>
 #include <random>
 #include <cassert>
+#include <unordered_map>
+#include <mutex>
 
 #if defined(HCL_ENABLE_THALLIUM_TCP) || defined(HCL_ENABLE_THALLIUM_ROCE)
 template <typename A>
@@ -38,9 +40,37 @@ struct thread_arg
   int num_operations;
 };
 
+std::unordered_map<int,int> *stl_map;
+std::mutex m;
 hcl::concurrent_unordered_map<int,int> *block_map;
 
-void map_operations(struct thread_arg *t)
+void stl_map_operations(struct thread_arg *t)
+{
+
+   for(int i=0;i<t->num_operations;i++)
+   {
+     uint32_t op = random()%3;
+     int k = random()%1000000;
+     m.lock();
+     if(op==0)
+     {
+	std::pair<int,int> p(k,k);
+	auto b = stl_map->insert(p);
+     }
+     else if(op==1)
+     {
+	auto b = stl_map->find(k);
+     }
+     else if(op==2)
+     {
+	 auto b = stl_map->erase(k);
+     }
+     m.unlock();
+   }
+
+
+}
+void hcl_map_operations(struct thread_arg *t)
 {
 
   for(int i=0;i<t->num_operations;i++)
@@ -124,6 +154,7 @@ int main(int argc, char *argv[]) {
   auto die = std::bind(dist,rd);
 
   block_map = new hcl::concurrent_unordered_map<int,int>();
+  stl_map = new std::unordered_map<int,int>();
 
   uint64_t total_size = 8192;
   block_map->initialize_tables(total_size,num_servers,my_server,INT32_MAX);
@@ -133,9 +164,11 @@ int main(int argc, char *argv[]) {
   num_request = 10000;
   double elapsed_time;
   double local_map_throughput=0, local_map_throughput_l=0;
+  double baseline_l=0,baseline=0;
 
   if(is_server)
   {
+	  
        int num_threads = 8;
        std::vector<struct thread_arg> t_args(num_threads);
        std::vector<std::thread> workers(num_threads);
@@ -147,19 +180,38 @@ int main(int argc, char *argv[]) {
 
        for(int i=0;i<num_threads;i++)
        {
+	  t_args[i].tid = i;
+	  if(i < rem) t_args[i].num_operations = num_ops+1;
+	  else t_args[i].num_operations = num_ops;
+	  std::thread t{stl_map_operations,&t_args[i]};
+	  workers[i] = std::move(t);
+       }
+
+       for(int i=0;i<num_threads;i++)
+	       workers[i].join();
+
+       auto t2 = std::chrono::high_resolution_clock::now();
+       elapsed_time = std::chrono::duration<double>(t2-t1).count();
+       baseline_l = num_request/elapsed_time;
+
+       t1 = std::chrono::high_resolution_clock::now();
+       for(int i=0;i<num_threads;i++)
+       {
 	    t_args[i].tid = i;
 	    if(i < rem) t_args[i].num_operations = num_ops+1;
 	    else t_args[i].num_operations = num_ops;
-	    std::thread t{map_operations,&t_args[i]};
+	    std::thread t{hcl_map_operations,&t_args[i]};
 	    workers[i] = std::move(t);
        }
 
        for(int i=0;i<num_threads;i++)
 	       workers[i].join();
-       auto t2 = std::chrono::high_resolution_clock::now();
+       t2 = std::chrono::high_resolution_clock::now();
        elapsed_time = std::chrono::duration<double>(t2-t1).count();
        local_map_throughput_l = (double) num_request / elapsed_time;
   }
+  MPI_Allreduce(&baseline_l,&baseline,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  if(my_rank==0) std::cout <<" Baseline throughput = "<<baseline<<"reqs/sec"<<std::endl;
   MPI_Allreduce(&local_map_throughput_l,&local_map_throughput,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
   if(my_rank==0) std::cout <<" Local_operations_throughput = "<<local_map_throughput<<" reqs/sec"<<std::endl;
@@ -214,6 +266,7 @@ int main(int argc, char *argv[]) {
   MPI_Allreduce(&remote_map_throughput_l,&remote_map_throughput,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
   if(my_rank==0) std::cout <<" Remote Operations throughput = "<<remote_map_throughput<<" req/sec"<<std::endl;
   delete (block_map);
+  delete (stl_map);
   MPI_Finalize();
   exit(EXIT_SUCCESS);
 }
