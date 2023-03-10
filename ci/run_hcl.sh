@@ -18,6 +18,12 @@ if [ "${HCL_ENABLE_RPCLIB}" = "ON" ]; then
     ctest -V -R ^unordered_map_test || exit 1
     echo "Testing unordered map string test"
     ctest -V -R ^unordered_map_string_test || exit 1
+    echo "Testing concurrent unordered map test"
+    ctest -V -R ^hashmap_test || exit 1
+    echo "Testing concurrent queue test"
+    ctest -V -R ^concurrent_queue_test || exit 1
+    echo "Testing concurrent skiplist test"
+    ctest -V -R ^skiplist_test || exit 1 
 fi
 
 if [ "${HCL_ENABLE_THALLIUM_TCP}" = "ON" ]; then
@@ -35,5 +41,11 @@ if [ "${HCL_ENABLE_THALLIUM_TCP}" = "ON" ]; then
     ctest -V -R ^queue_test || exit 1
     echo "Testing set"
     ctest -V -R ^set_test || exit 1
+    echo "Testing concurrent unordered map test"
+    ctest -V -R ^hashmap_test || exit 1
+    echo "Testing concurrent queue test"
+    ctest -V -R ^concurrent_queue_test || exit 1
+    echo "Testing concurrent skiplist test"
+    ctest -V -R ^skiplist_test || exit 1
 fi
 popd
