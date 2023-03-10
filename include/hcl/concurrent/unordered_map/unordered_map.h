@@ -287,11 +287,11 @@ class concurrent_unordered_map : public container
   THALLIUM_DEFINE(LocalUpdate, (k,v), KeyT& k, ValueT& v)
 #endif
 
-   bool Insert(uint64_t &s, KeyT& k,ValueT& v);
-   bool Find(uint64_t &s,KeyT& k);
-   bool Erase(uint64_t &s, KeyT& k);
-   ValueT Get(uint64_t &s, KeyT& k);
-   bool Update(uint64_t &s, KeyT& k,ValueT& v);
+   bool Insert(KeyT& k,ValueT& v);
+   bool Find(KeyT& k);
+   bool Erase(KeyT& k);
+   ValueT Get(KeyT& k);
+   bool Update(KeyT& k,ValueT& v);
 
 
 };

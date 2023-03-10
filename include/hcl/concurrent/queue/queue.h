@@ -127,7 +127,7 @@ private:
     AutoTrace trace = AutoTrace("hcl::concurrent_queue");
     if (is_server) 
     {
-      queue = new queue_type (1024);
+      queue = new queue_type (128);
       bind_functions();
     } 
     else if (!is_server && server_on_node) 
@@ -157,7 +157,7 @@ private:
   THALLIUM_DEFINE1(LocalPop)
 #endif
 
-   bool Push(uint64_t &s, ValueT& v);
+   bool Push(uint64_t &s,ValueT& v);
    std::pair<bool,ValueT> Pop(uint64_t &s);
 
 };

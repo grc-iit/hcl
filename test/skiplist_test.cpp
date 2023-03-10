@@ -215,17 +215,16 @@ int main(int argc, char *argv[]) {
     {
 	int op = random()%3;
         int value = dist(rd)%10000;
-        uint64_t k = s->serverLocation(value);
 	if(op==0)
 	{
-           s->Insert(k,value);
+           s->Insert(value);
 	}
 	else if(op==1)
 	{
-	   s->Find(k,value);
+	   s->Find(value);
 	}
 	else
-	   s->Erase(k,value);
+	   s->Erase(value);
      }
   
      auto t2 = std::chrono::high_resolution_clock::now();

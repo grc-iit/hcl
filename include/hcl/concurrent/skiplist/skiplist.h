@@ -213,9 +213,9 @@ class concurrent_skiplist : public container
     THALLIUM_DEFINE(LocalErase, (k), T& k)
 #endif
    
-   bool Insert(uint64_t &s, T& k);
-   bool Find(uint64_t &s,T& k);
-   bool Erase(uint64_t &s, T& k);
+   bool Insert(T& k);
+   bool Find(T& k);
+   bool Erase(T& k);
 
 };
 #include "skiplist.cpp"

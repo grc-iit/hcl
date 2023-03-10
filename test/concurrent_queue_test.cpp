@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
 
   if(is_server)
   {
-     int num_threads = 8;
+     int num_threads = 12;
      std::vector<struct thread_arg> t_args(num_threads);
      std::vector<std::thread> workers(num_threads);
 

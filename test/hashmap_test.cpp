@@ -241,20 +241,17 @@ int main(int argc, char *argv[]) {
 	if(op==0)
 	{
 	    int k = dist(rd);
-	    uint64_t r = block_map->serverLocation(k);
-	    bool s = block_map->Insert(r,k,k);
+	    bool s = block_map->Insert(k,k);
 	}
 	else if(op==1)
 	{
 	   int k = dist(rd);
-	   uint64_t r = block_map->serverLocation(k);
-	   bool s = block_map->Find(r,k);
+	   bool s = block_map->Find(k);
 	}
 	else if(op==2)
 	{
 	  int k = dist(rd);
-	  uint64_t r = block_map->serverLocation(k);
-	  bool s = block_map->Erase(r,k);
+	  bool s = block_map->Erase(k);
 	}
     }
 
